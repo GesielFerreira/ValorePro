@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --brand: 168 100% 37%;
+    --brand-foreground: 0 0% 100%;
+    --background: 210 20% 98%;
+    --foreground: 215 25% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 10%;
+    --primary: 168 100% 37%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 15% 94%;
+    --secondary-foreground: 215 25% 10%;
+    --muted: 213 15% 94%;
+    --muted-foreground: 215 10% 45%;
+    --accent: 213 15% 94%;
+    --accent-foreground: 215 25% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 15% 88%;
+    --input: 214 15% 88%;
+    --ring: 168 100% 37%;
+    --radius: 0.75rem;
+    --warning: 38 92% 50%;
+    --success: 168 100% 37%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* PWA safe areas */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Scan animation for search loading */
+.scan-overlay {
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(0, 191, 166, 0.08) 50%,
+      transparent 100%);
+}
+
+/* Trust badge glow */
+.trust-glow-green {
+  box-shadow: 0 0 12px rgba(0, 191, 166, 0.3);
+}
+
+.trust-glow-yellow {
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.3);
+}
+
+.trust-glow-red {
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Glass effect for cards */
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
