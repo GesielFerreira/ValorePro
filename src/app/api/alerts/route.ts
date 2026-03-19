@@ -77,9 +77,13 @@ export async function POST(request: NextRequest) {
             .eq('user_id', profile.id)
             .eq('status', 'active');
 
-        const alertLimit = profile.plan === 'free' ? 3 : profile.plan === 'pro' ? 20 : 100;
+        // Dynamically determining alert limits based on the user's plan
+        let alertLimit = 3; // default for free
+        if (profile.plan === 'pro') alertLimit = 10;
+        if (profile.plan === 'premium') alertLimit = -1; // -1 means unlimited
+        if (profile.plan === 'ilimitado') alertLimit = -1;
 
-        if ((count || 0) >= alertLimit) {
+        if (alertLimit !== -1 && (count || 0) >= alertLimit) {
             return NextResponse.json(
                 { error: `Limite de ${alertLimit} alertas ativos atingido.`, upgrade: true },
                 { status: 429 },

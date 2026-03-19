@@ -64,12 +64,28 @@ export const PLANS: Record<string, PlanConfig> = {
         ],
         iaPurchase: true,
     },
+    ilimitado: {
+        id: 'ilimitado',
+        name: 'Ilimitado',
+        price: 29990,
+        priceLabel: 'R$ 299,90',
+        credits: -1,
+        alerts: -1,
+        features: [
+            'Buscas ilimitadas',
+            'Alertas ilimitados',
+            'Compra automática por IA',
+            'Histórico completo de buscas',
+            'Score de confiança de lojas',
+            'Suporte prioritário VIP',
+        ],
+        iaPurchase: true,
+    },
 };
 
 // Credit add-on packs
 export const CREDIT_PACKS = [
     { id: 'pack_15', credits: 15, price: 990, priceLabel: 'R$ 9,90' },
-    { id: 'pack_40', credits: 40, price: 1990, priceLabel: 'R$ 19,90' },
 ];
 
 export function getPlan(planId: string): PlanConfig | null {

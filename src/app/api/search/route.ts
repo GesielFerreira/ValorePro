@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
                 throw { status: 404, message: 'Perfil não encontrado.' };
             }
 
-            if (profile.plan === 'free' && profile.searches_today >= profile.searches_limit) {
+            if (profile.searches_limit !== -1 && profile.searches_today >= profile.searches_limit) {
                 throw { 
                     status: 429, 
                     message: 'Limite de buscas diárias atingido.', 

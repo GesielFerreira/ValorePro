@@ -44,6 +44,20 @@ const PLANS: Plan[] = [
             'Score de confiança',
             'Suporte prioritário',
         ]
+    },
+    {
+        id: 'ilimitado',
+        name: 'Ilimitado',
+        price: 29990,
+        credits: -1,
+        features: [
+            'Buscas ilimitadas',
+            'Alertas ilimitados',
+            'Compra automática por IA',
+            'Histórico completo de buscas',
+            'Score de confiança de lojas',
+            'Suporte prioritário VIP',
+        ]
     }
 ];
 
@@ -148,17 +162,71 @@ export default function PlansPage() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="text-center max-w-2xl mx-auto mb-12">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                    Escolha o plano ideal
+                    Assinaturas e Buscas Avulsas
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400">
-                    Ferramentas avançadas para você não perder mais tempo e dinheiro pesquisando online.
+                    Ferramentas avançadas para não perder dinheiro. Assine um plano mensal ou compre buscas avulsas.
                 </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {CREDIT_PACKS.map((pack) => (
+                    <div key={pack.id} className="relative rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col p-6 shadow-sm transition-all hover:shadow-md">
+                        <div className="absolute -top-3 left-0 right-0 flex justify-center">
+                            <span className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                                <PackagePlus className="w-3 h-3" /> PACOTE AVULSO
+                            </span>
+                        </div>
+
+                        <div className="mb-6 mt-2">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{pack.credits} Buscas</h3>
+                            <div className="mt-4 flex items-baseline text-4xl font-extrabold text-gray-900 dark:text-white">
+                                {pack.priceLabel}
+                            </div>
+                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                Pagamento único
+                            </p>
+                        </div>
+
+                        <ul className="space-y-4 mb-8 flex-1">
+                            <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                                <Check className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                                <span>{pack.credits} buscas avulsas adicionadas na hora</span>
+                            </li>
+                            <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
+                                <X className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                                <span className="line-through decoration-gray-300 dark:decoration-gray-600">Alertas de preço</span>
+                            </li>
+                            <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
+                                <X className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                                <span className="line-through decoration-gray-300 dark:decoration-gray-600">Histórico completo de buscas</span>
+                            </li>
+                            <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
+                                <X className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                                <span className="line-through decoration-gray-300 dark:decoration-gray-600">Score de confiança de lojas</span>
+                            </li>
+                            <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                                <Check className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                                <span>Suporte por e-mail</span>
+                            </li>
+                        </ul>
+
+                        <button
+                            onClick={() => handlePurchasePack(pack.id)}
+                            disabled={purchasingPack === pack.id}
+                            className="w-full font-semibold mt-auto py-2.5 px-4 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center"
+                        >
+                            {purchasingPack === pack.id ? (
+                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processando...</>
+                            ) : (
+                                'Comprar Agora'
+                            )}
+                        </button>
+                    </div>
+                ))}
                 {PLANS.map((plan) => {
                     const isCurrent = currentPlan === plan.id;
                     const isPopular = plan.popular;
@@ -178,14 +246,14 @@ export default function PlansPage() {
                                 </div>
                             )}
 
-                            <div className="mb-6">
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{plan.name}</h3>
+                            <div className="mb-6 mt-2">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Assinatura {plan.name}</h3>
                                 <div className="mt-4 flex items-baseline text-4xl font-extrabold text-gray-900 dark:text-white">
                                     {formatCurrency(plan.price / 100)}
                                     <span className="ml-1 text-xl font-medium text-gray-500 dark:text-gray-400">/mês</span>
                                 </div>
                                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                                    {plan.credits} buscas por mês
+                                    {plan.credits === -1 ? 'Buscas ilimitadas' : `${plan.credits} buscas por mês`}
                                 </p>
                             </div>
 
@@ -199,7 +267,7 @@ export default function PlansPage() {
                             </ul>
 
                             <button
-                                className={`w-full font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center transition-colors ${
+                                className={`w-full font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center transition-colors mt-auto ${
                                     isCurrent 
                                         ? 'bg-gray-100 text-gray-500 cursor-default hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-400'
                                         : isPopular 
@@ -226,12 +294,12 @@ export default function PlansPage() {
             </div>
 
             {cards.length === 0 && (
-                <div className="mt-12 max-w-md mx-auto bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-900/50 flex items-start gap-4">
+                <div className="mt-12 max-w-2xl mx-auto bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-900/50 flex items-start gap-4">
                     <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                     <div>
                         <h4 className="font-medium text-blue-900 dark:text-blue-200">Precisa de um cartão</h4>
                         <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                            Para assinar os planos Pro ou Premium, você precisa cadastrar um cartão de crédito nas suas configurações.
+                            Para assinar planos ou comprar buscas avulsas, você precisa cadastrar um cartão de crédito nas suas configurações.
                         </p>
                         <button 
                             className="mt-3 bg-white dark:bg-transparent border border-gray-200 dark:border-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-sm font-medium flex items-center transition-colors"
@@ -243,64 +311,6 @@ export default function PlansPage() {
                     </div>
                 </div>
             )}
-
-            {/* Credit Packs Section */}
-            <div className="mt-20 max-w-4xl mx-auto">
-                <div className="text-center mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-2">
-                        <PackagePlus className="w-6 h-6 text-purple-600" />
-                        Buscas Avulsas
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 mt-2">
-                        Compre pacotes de buscas avulsas. Ideal para testar sem assinatura ou suplementar seu plano.
-                    </p>
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-                    {CREDIT_PACKS.map((pack) => (
-                        <div key={pack.id} className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-2xl p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow">
-                            <div className="mb-6 text-center">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white">
-                                    +{pack.credits} Buscas
-                                </h4>
-                                <div className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 mt-2">
-                                    {pack.priceLabel}
-                                </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Pagamento único
-                                </p>
-                            </div>
-
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <Check className="w-5 h-5 text-purple-600 flex-shrink-0" />
-                                    <span>{pack.credits} buscas integradas no momento da compra</span>
-                                </li>
-                                <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
-                                    <X className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                                    <span className="line-through decoration-gray-300 dark:decoration-gray-600">10 alertas de preço automáticos</span>
-                                </li>
-                                <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
-                                    <X className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                                    <span className="line-through decoration-gray-300 dark:decoration-gray-600">Histórico completo de buscas salvo</span>
-                                </li>
-                            </ul>
-
-                            <button
-                                onClick={() => handlePurchasePack(pack.id)}
-                                disabled={purchasingPack === pack.id}
-                                className="w-full font-semibold py-2 px-4 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center"
-                            >
-                                {purchasingPack === pack.id ? (
-                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processando...</>
-                                ) : (
-                                    'Comprar Agora'
-                                )}
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </div>
         </div>
     );
 }

@@ -4,12 +4,16 @@
 -- Tabela de assinaturas para gerenciar planos de pagamento
 -- ============================================================
 
+-- Adicionamos novos valores de plano caso não existam
+ALTER TYPE user_plan ADD VALUE IF NOT EXISTS 'premium';
+ALTER TYPE user_plan ADD VALUE IF NOT EXISTS 'ilimitado';
+
 CREATE TYPE subscription_status AS ENUM ('active', 'past_due', 'cancelled', 'trialing');
 
 CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'premium')),
+    plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'premium', 'ilimitado', 'enterprise')),
     status subscription_status NOT NULL DEFAULT 'active',
 
     -- Pagar.me integration (ready for future use)
@@ -55,6 +59,7 @@ BEGIN
         searches_limit = CASE
             WHEN NEW.plan = 'pro' THEN 100
             WHEN NEW.plan = 'premium' THEN 300
+            WHEN NEW.plan = 'ilimitado' THEN -1
             ELSE 5
         END,
         updated_at = NOW()

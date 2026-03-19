@@ -701,7 +701,7 @@ export type Database = {
             search_status: "pending" | "processing" | "completed" | "failed"
             subscription_status: "active" | "past_due" | "cancelled" | "trialing"
             trust_level: "safe" | "caution" | "risky"
-            user_plan: "free" | "pro" | "premium" | "enterprise"
+            user_plan: "free" | "pro" | "premium" | "ilimitado" | "enterprise"
         }
         CompositeTypes: {
             [_ in never]: never
