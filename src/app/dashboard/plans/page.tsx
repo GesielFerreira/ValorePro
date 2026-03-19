@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Loader2, CreditCard, Sparkles, Building2, PackagePlus } from 'lucide-react';
+import { Check, X, Loader2, CreditCard, Sparkles, Building2, PackagePlus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { CREDIT_PACKS } from '@/server/services/payment';
 import { toast } from 'sonner';
@@ -258,8 +258,8 @@ export default function PlansPage() {
 
                 <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
                     {CREDIT_PACKS.map((pack) => (
-                        <div key={pack.id} className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-2xl p-6 flex flex-col justify-between items-center text-center shadow-sm hover:shadow-md transition-shadow">
-                            <div className="mb-4">
+                        <div key={pack.id} className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-2xl p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow">
+                            <div className="mb-6 text-center">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white">
                                     +{pack.credits} Buscas
                                 </h4>
@@ -270,6 +270,22 @@ export default function PlansPage() {
                                     Pagamento único
                                 </p>
                             </div>
+
+                            <ul className="space-y-4 mb-8 flex-1">
+                                <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                                    <Check className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                                    <span>{pack.credits} buscas integradas no momento da compra</span>
+                                </li>
+                                <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
+                                    <X className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                    <span className="line-through decoration-gray-300 dark:decoration-gray-600">10 alertas de preço automáticos</span>
+                                </li>
+                                <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
+                                    <X className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                    <span className="line-through decoration-gray-300 dark:decoration-gray-600">Histórico completo de buscas salvo</span>
+                                </li>
+                            </ul>
+
                             <button
                                 onClick={() => handlePurchasePack(pack.id)}
                                 disabled={purchasingPack === pack.id}
