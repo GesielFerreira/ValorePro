@@ -18,16 +18,6 @@ interface Plan {
 
 const PLANS: Plan[] = [
     {
-        id: 'free',
-        name: 'Gratuito',
-        price: 0,
-        credits: 90, // ~3 por dia
-        features: [
-            '3 buscas por dia',
-            'Histórico básico',
-        ]
-    },
-    {
         id: 'pro',
         name: 'Pro',
         price: 3490,
@@ -85,11 +75,6 @@ export default function PlansPage() {
     }, []);
 
     const handleSubscribe = async (planId: string) => {
-        if (planId === 'free') {
-            toast.info('Você já está no plano ou ele é o padrão.');
-            return;
-        }
-
         if (cards.length === 0) {
             toast.error('Adicione um cartão de crédito primeiro.');
             router.push('/dashboard/settings?tab=cards');
@@ -196,8 +181,8 @@ export default function PlansPage() {
                             <div className="mb-6">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">{plan.name}</h3>
                                 <div className="mt-4 flex items-baseline text-4xl font-extrabold text-gray-900 dark:text-white">
-                                    {plan.price === 0 ? 'Grátis' : formatCurrency(plan.price / 100)}
-                                    {plan.price > 0 && <span className="ml-1 text-xl font-medium text-gray-500 dark:text-gray-400">/mês</span>}
+                                    {formatCurrency(plan.price / 100)}
+                                    <span className="ml-1 text-xl font-medium text-gray-500 dark:text-gray-400">/mês</span>
                                 </div>
                                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                     {plan.credits} buscas por mês
@@ -228,8 +213,6 @@ export default function PlansPage() {
                                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processando...</>
                                 ) : isCurrent ? (
                                     'Seu Plano Atual'
-                                ) : plan.price === 0 ? (
-                                    'Continuar Grátis'
                                 ) : (
                                     <>
                                         <CreditCard className="w-4 h-4 mr-2" />
@@ -266,10 +249,10 @@ export default function PlansPage() {
                 <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-2">
                         <PackagePlus className="w-6 h-6 text-purple-600" />
-                        Créditos Adicionais
+                        Buscas Avulsas
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400 mt-2">
-                        Precisa de mais buscas este mês? Adicione um pacote avulso sem alterar sua assinatura.
+                        Compre pacotes de buscas avulsas. Ideal para testar sem assinatura ou suplementar seu plano.
                     </p>
                 </div>
 
