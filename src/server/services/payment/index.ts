@@ -35,10 +35,10 @@ export const PLANS: Record<string, PlanConfig> = {
         name: 'Pro',
         price: 3490,
         priceLabel: 'R$ 34,90',
-        credits: 100,
+        credits: 50,
         alerts: 10,
         features: [
-            '100 buscas por mês',
+            '50 buscas por mês',
             '10 alertas de preço',
             'Histórico completo de buscas',
             'Score de confiança de lojas',
@@ -52,10 +52,10 @@ export const PLANS: Record<string, PlanConfig> = {
         name: 'Premium',
         price: 7990,
         priceLabel: 'R$ 79,90',
-        credits: 300,
+        credits: 120,
         alerts: -1,
         features: [
-            '300 buscas por mês',
+            '120 buscas por mês',
             'Alertas ilimitados',
             'Compra automática por IA',
             'Histórico completo de buscas',
@@ -85,7 +85,7 @@ export const PLANS: Record<string, PlanConfig> = {
 
 // Credit add-on packs
 export const CREDIT_PACKS = [
-    { id: 'pack_15', credits: 15, price: 990, priceLabel: 'R$ 9,90' },
+    { id: 'pack_10', credits: 10, price: 990, priceLabel: 'R$ 9,90' },
 ];
 
 export function getPlan(planId: string): PlanConfig | null {

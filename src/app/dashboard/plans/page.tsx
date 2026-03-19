@@ -21,10 +21,10 @@ const PLANS: Plan[] = [
         id: 'pro',
         name: 'Pro',
         price: 3490,
-        credits: 100,
+        credits: 50,
         popular: true,
         features: [
-            '100 buscas por mês',
+            '50 buscas por mês',
             '10 alertas de preço',
             'Histórico completo de buscas',
             'Score de confiança de lojas',
@@ -35,9 +35,9 @@ const PLANS: Plan[] = [
         id: 'premium',
         name: 'Premium',
         price: 7990,
-        credits: 300,
+        credits: 120,
         features: [
-            '300 buscas por mês',
+            '120 buscas por mês',
             'Alertas ilimitados',
             'Compra automática por IA',
             'Histórico completo',
@@ -195,18 +195,6 @@ export default function PlansPage() {
                             <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
                                 <Check className="w-5 h-5 text-purple-600 flex-shrink-0" />
                                 <span>{pack.credits} buscas avulsas adicionadas na hora</span>
-                            </li>
-                            <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
-                                <X className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                                <span className="line-through decoration-gray-300 dark:decoration-gray-600">Alertas de preço</span>
-                            </li>
-                            <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
-                                <X className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                                <span className="line-through decoration-gray-300 dark:decoration-gray-600">Histórico completo de buscas</span>
-                            </li>
-                            <li className="flex gap-3 text-sm text-gray-400 dark:text-gray-500">
-                                <X className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                                <span className="line-through decoration-gray-300 dark:decoration-gray-600">Score de confiança de lojas</span>
                             </li>
                             <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
                                 <Check className="w-5 h-5 text-purple-600 flex-shrink-0" />
