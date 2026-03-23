@@ -15,7 +15,9 @@ export default function SignUpPage() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
 
@@ -24,7 +26,7 @@ export default function SignUpPage() {
         upper: /[A-Z]/.test(password),
         number: /[0-9]/.test(password),
     };
-    const passwordValid = Object.values(passwordChecks).every(Boolean);
+    const passwordValid = Object.values(passwordChecks).every(Boolean) && password === confirmPassword && password.length > 0;
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -174,6 +176,34 @@ export default function SignUpPage() {
                                         </div>
                                     ))}
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div>
+                            <label className="block text-sm font-medium text-surface-600 mb-1.5">
+                                Confirmar Senha
+                            </label>
+                            <div className="relative">
+                                <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                                <input
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    placeholder="Repita sua senha"
+                                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-surface-200 bg-surface-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
+                                >
+                                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                            {confirmPassword.length > 0 && password !== confirmPassword && (
+                                <p className="text-xs text-red-500 mt-1.5 font-medium">As senhas não coincidem</p>
                             )}
                         </div>
 
