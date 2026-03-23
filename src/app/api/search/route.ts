@@ -66,9 +66,12 @@ export async function POST(request: NextRequest) {
             }
 
             if (profile.searches_limit !== -1 && profile.searches_today >= profile.searches_limit) {
+                const isNoPlan = profile.searches_limit === 0;
                 throw { 
                     status: 429, 
-                    message: 'Limite de buscas diárias atingido.', 
+                    message: isNoPlan 
+                        ? 'Ative um plano para realizar buscas.' 
+                        : 'Limite de buscas diárias atingido.', 
                     payload: { limit: profile.searches_limit, upgrade: true } 
                 };
             }

@@ -66,7 +66,7 @@ export default function PlansPage() {
     const [loading, setLoading] = useState(true);
     const [subscribingTo, setSubscribingTo] = useState<string | null>(null);
     const [purchasingPack, setPurchasingPack] = useState<string | null>(null);
-    const [currentPlan, setCurrentPlan] = useState<string>('free');
+    const [currentPlan, setCurrentPlan] = useState<string>('');
     const [cards, setCards] = useState<any[]>([]);
 
     useEffect(() => {
@@ -76,7 +76,7 @@ export default function PlansPage() {
                 const userRes = await fetch('/api/user');
                 if (userRes.ok) {
                     const data = await userRes.json();
-                    setCurrentPlan(data.profile?.plan || 'free');
+                    setCurrentPlan(data.profile?.plan || '');
                     setCards(data.cards || []);
                 }
             } catch (err) {

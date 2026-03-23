@@ -64,6 +64,8 @@ export default function ResultsPage() {
     const [error, setError] = useState<string | null>(null);
     const [showChart, setShowChart] = useState(false);
     const [needsLogin, setNeedsLogin] = useState(false);
+    const [needsUpgrade, setNeedsUpgrade] = useState(false);
+    const [isNoPlan, setIsNoPlan] = useState(false);
     const [storeReputations, setStoreReputations] = useState<Record<string, any>>({});
 
 
@@ -123,6 +125,8 @@ export default function ResultsPage() {
         setLoading(true);
         setError(null);
         setNeedsLogin(false);
+        setNeedsUpgrade(false);
+        setIsNoPlan(false);
 
         try {
             const res = await fetch('/api/search', {
@@ -137,8 +141,11 @@ export default function ResultsPage() {
                 if (res.status === 401) {
                     setNeedsLogin(true);
                     setError('Faça login para buscar produtos.');
-                } else if (res.status === 429) {
-                    setError('Limite de buscas diárias atingido. Faça upgrade para o plano Pro.');
+                } else if (res.status === 429 && data.upgrade) {
+                    setNeedsUpgrade(true);
+                    const noPlan = data.limit === 0;
+                    setIsNoPlan(noPlan);
+                    setError(data.error || 'Limite atingido.');
                 } else {
                     setError(data.error || 'Erro ao buscar produtos.');
                 }
@@ -222,33 +229,69 @@ export default function ResultsPage() {
                 </button>
 
                 <div className="text-center py-16">
-                    <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
-                        <AlertTriangle size={28} className="text-amber-500" />
-                    </div>
-                    <h2 className="text-lg font-bold text-surface-900 mb-2">{error}</h2>
-                    <div className="flex items-center justify-center gap-3 mt-6">
-                        {needsLogin ? (
-                            <button
-                                onClick={() => router.push('/login')}
-                                className="px-6 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-all"
-                            >
-                                Fazer Login
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => fetchResults(true)}
-                                className="px-6 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-all flex items-center gap-2"
-                            >
-                                <RefreshCw size={16} /> Tentar novamente
-                            </button>
-                        )}
-                        <button
-                            onClick={() => router.push('/')}
-                            className="px-6 py-2.5 rounded-xl border border-surface-200 text-sm font-medium text-surface-600 hover:bg-surface-50 transition-all"
-                        >
-                            Nova busca
-                        </button>
-                    </div>
+                    {needsUpgrade ? (
+                        <>
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-50 to-brand-100 flex items-center justify-center mx-auto mb-5">
+                                <Sparkles size={32} className="text-brand-500" />
+                            </div>
+                            <h2 className="text-xl font-bold text-surface-900 mb-2">
+                                {isNoPlan ? 'Você ainda não tem um plano ativo' : 'Seus créditos de busca acabaram'}
+                            </h2>
+                            <p className="text-sm text-surface-500 max-w-sm mx-auto mb-6">
+                                {isNoPlan
+                                    ? 'Para buscar os melhores preços, ative um plano ou compre créditos avulsos.'
+                                    : 'Você atingiu o limite de buscas do seu plano. Faça um upgrade ou compre créditos avulsos para continuar.'}
+                            </p>
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                                <button
+                                    onClick={() => router.push('/dashboard/plans')}
+                                    className="w-full sm:w-auto px-8 py-3 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20"
+                                >
+                                    <Sparkles size={16} />
+                                    {isNoPlan ? 'Ver Planos' : 'Fazer Upgrade'}
+                                </button>
+                                <button
+                                    onClick={() => router.push('/')}
+                                    className="w-full sm:w-auto px-6 py-3 rounded-xl border border-surface-200 text-sm font-medium text-surface-600 hover:bg-surface-50 transition-all"
+                                >
+                                    Voltar ao início
+                                </button>
+                            </div>
+                            <p className="text-xs text-surface-400 mt-6">
+                                Planos a partir de R$ 29,90/mês com até 100 buscas diárias
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+                                <AlertTriangle size={28} className="text-amber-500" />
+                            </div>
+                            <h2 className="text-lg font-bold text-surface-900 mb-2">{error}</h2>
+                            <div className="flex items-center justify-center gap-3 mt-6">
+                                {needsLogin ? (
+                                    <button
+                                        onClick={() => router.push('/login')}
+                                        className="px-6 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-all"
+                                    >
+                                        Fazer Login
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => fetchResults(true)}
+                                        className="px-6 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-all flex items-center gap-2"
+                                    >
+                                        <RefreshCw size={16} /> Tentar novamente
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => router.push('/')}
+                                    className="px-6 py-2.5 rounded-xl border border-surface-200 text-sm font-medium text-surface-600 hover:bg-surface-50 transition-all"
+                                >
+                                    Nova busca
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         );

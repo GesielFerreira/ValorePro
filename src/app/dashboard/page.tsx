@@ -93,7 +93,13 @@ export default function DashboardPage() {
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
                 <h1 className="text-xl font-bold text-surface-900">Olá, {data.user.name} 👋</h1>
                 <p className="text-sm text-surface-500">
-                    Plano {data.user.plan} · {data.user.searchesToday}/{data.user.searchesLimit} buscas hoje
+                    {data.user.plan === 'free' || !data.user.plan ? (
+                        <>Sem plano ativo · <Link href="/dashboard/plans" className="text-brand-500 font-medium hover:underline">Ativar plano</Link></>
+                    ) : data.user.searchesLimit === -1 ? (
+                        <>Plano {data.user.plan} · Buscas ilimitadas</>
+                    ) : (
+                        <>Plano {data.user.plan} · {data.user.searchesToday}/{data.user.searchesLimit} buscas hoje</>
+                    )}
                 </p>
             </motion.div>
 

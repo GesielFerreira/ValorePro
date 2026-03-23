@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
             .eq('status', 'active');
 
         // Dynamically determining alert limits based on the user's plan
-        let alertLimit = 3; // default for free
+        let alertLimit = 0; // no plan = no alerts
         if (profile.plan === 'pro') alertLimit = 10;
         if (profile.plan === 'premium') alertLimit = -1; // -1 means unlimited
         if (profile.plan === 'ilimitado') alertLimit = -1;

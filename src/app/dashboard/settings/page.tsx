@@ -406,7 +406,7 @@ export default function SettingsPage() {
                                 onClick={() => router.push('/dashboard/plans')}
                                 className="px-4 py-2 bg-brand-50 text-brand-600 hover:bg-brand-100 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap"
                             >
-                                {profile.plan === 'free' ? 'Fazer Upgrade' : 'Mudar Plano'}
+                                {profile.plan === 'free' ? 'Ativar Plano' : 'Mudar Plano'}
                             </button>
                         </div>
                     </div>
