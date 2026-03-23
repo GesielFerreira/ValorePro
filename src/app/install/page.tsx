@@ -100,13 +100,13 @@ export default function InstallPage() {
                                 <div className="flex items-start gap-4">
                                     <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm shrink-0">2</div>
                                     <p className="text-surface-600 text-sm pt-1.5">
-                                        Role para baixo e toque em <strong>"Adicionar à Tela de Início"</strong> <PlusSquare size={16} className="inline-block mx-1 -mt-1" />.
+                                        Role para baixo e toque em <strong>&quot;Adicionar à Tela de Início&quot;</strong> <PlusSquare size={16} className="inline-block mx-1 -mt-1" />.
                                     </p>
                                 </div>
                                 <div className="flex items-start gap-4">
                                     <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm shrink-0">3</div>
                                     <p className="text-surface-600 text-sm pt-1.5">
-                                        Toque em <strong>"Adicionar"</strong> no canto superior direito.
+                                        Toque em <strong>&quot;Adicionar&quot;</strong> no canto superior direito.
                                     </p>
                                 </div>
                             </div>
@@ -142,13 +142,13 @@ export default function InstallPage() {
                                     <div className="flex items-start gap-4">
                                         <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm shrink-0">2</div>
                                         <p className="text-surface-600 text-sm pt-1.5">
-                                            Selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.
+                                            Selecione <strong>&quot;Instalar aplicativo&quot;</strong> ou <strong>&quot;Adicionar à tela inicial&quot;</strong>.
                                         </p>
                                     </div>
                                     <div className="flex items-start gap-4">
                                         <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm shrink-0">3</div>
                                         <p className="text-surface-600 text-sm pt-1.5">
-                                            Confirme tocando em <strong>"Instalar"</strong>.
+                                            Confirme tocando em <strong>&quot;Instalar&quot;</strong>.
                                         </p>
                                     </div>
                                 </div>
