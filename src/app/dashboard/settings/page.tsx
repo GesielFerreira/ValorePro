@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, CreditCard, MapPin, Bell, Shield, Plus, Edit2, Lock, Loader2, LogIn, Save, X, Trash2 } from 'lucide-react';
+import { User, CreditCard, MapPin, Bell, Shield, Plus, Edit2, Lock, Loader2, LogIn, Save, X, Trash2, ScanFace, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { FaceRegister } from '@/components/FaceRegister';
 
 interface UserProfile {
     name: string;
@@ -47,7 +48,7 @@ interface UserAddress {
 
 export default function SettingsPage() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<'profile' | 'cards' | 'address' | 'notifications'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'cards' | 'address' | 'notifications' | 'security'>('profile');
     const [loading, setLoading] = useState(true);
     const [needsLogin, setNeedsLogin] = useState(false);
     const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -62,6 +63,9 @@ export default function SettingsPage() {
     // Modal state
     const [showCardForm, setShowCardForm] = useState(false);
     const [showAddressForm, setShowAddressForm] = useState(false);
+    const [showFaceRegister, setShowFaceRegister] = useState(false);
+    const [hasFaceId, setHasFaceId] = useState(false);
+    const [loadingFaceId, setLoadingFaceId] = useState(true);
 
     // Card form
     const [cardForm, setCardForm] = useState({
@@ -89,6 +93,22 @@ export default function SettingsPage() {
             }
         }
         load();
+    }, []);
+
+    // Fetch Face ID status
+    useEffect(() => {
+        async function checkFaceId() {
+            try {
+                const res = await fetch('/api/face');
+                if (res.ok) {
+                    const data = await res.json();
+                    setHasFaceId(data.hasDescriptor);
+                }
+            } catch { /* ignore */ } finally {
+                setLoadingFaceId(false);
+            }
+        }
+        checkFaceId();
     }, []);
 
     async function handleSaveField(field: string) {
@@ -242,7 +262,8 @@ export default function SettingsPage() {
         { id: 'profile' as const, icon: User, label: 'Perfil' },
         { id: 'cards' as const, icon: CreditCard, label: 'Cartões' },
         { id: 'address' as const, icon: MapPin, label: 'Endereço' },
-        { id: 'notifications' as const, icon: Bell, label: 'Notificações' },
+        { id: 'notifications' as const, icon: Bell, label: 'Avisos' },
+        { id: 'security' as const, icon: Shield, label: 'Segurança' },
     ];
 
     async function handleToggleNotification(key: keyof NonNullable<UserProfile['notification_prefs']>) {
@@ -719,6 +740,96 @@ export default function SettingsPage() {
                         })}
                     </div>
                 </motion.div>
+            )}
+
+            {/* Security / Face ID */}
+            {activeTab === 'security' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="bg-white rounded-2xl border border-surface-200 p-5">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center">
+                                <ScanFace size={22} className="text-brand-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-surface-900">Face ID</h3>
+                                <p className="text-xs text-surface-500">Reconhecimento facial para confirmar compras</p>
+                            </div>
+                        </div>
+
+                        {loadingFaceId ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 size={24} className="animate-spin text-surface-400" />
+                            </div>
+                        ) : hasFaceId ? (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                                    <CheckCircle2 size={20} className="text-emerald-600" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-emerald-800">Face ID ativo</p>
+                                        <p className="text-xs text-emerald-600">Suas compras serão confirmadas com reconhecimento facial.</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowFaceRegister(true)}
+                                        className="flex-1 py-2.5 rounded-xl bg-surface-100 hover:bg-surface-200 text-sm font-medium text-surface-700 transition-colors"
+                                    >
+                                        Recadastrar
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const res = await fetch('/api/face', { method: 'DELETE' });
+                                                if (res.ok) {
+                                                    setHasFaceId(false);
+                                                    toast.success('Face ID removido');
+                                                }
+                                            } catch {
+                                                toast.error('Erro ao remover Face ID');
+                                            }
+                                        }}
+                                        className="flex-1 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-sm font-medium text-red-600 transition-colors flex items-center justify-center gap-1.5"
+                                    >
+                                        <Trash2 size={14} />
+                                        Remover
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                    <Shield size={20} className="text-amber-600" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-amber-800">Face ID não cadastrado</p>
+                                        <p className="text-xs text-amber-600">Cadastre para maior segurança nas compras automáticas.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowFaceRegister(true)}
+                                    className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                                >
+                                    <ScanFace size={18} />
+                                    Cadastrar Face ID
+                                </button>
+                            </div>
+                        )}
+
+                        <p className="text-[11px] text-surface-400 mt-4">
+                            🔒 Seus dados faciais são processados 100% no seu dispositivo. Nenhuma imagem é enviada ao servidor.
+                        </p>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Face Register Modal */}
+            {showFaceRegister && (
+                <FaceRegister
+                    onComplete={() => {
+                        setShowFaceRegister(false);
+                        setHasFaceId(true);
+                    }}
+                    onCancel={() => setShowFaceRegister(false)}
+                />
             )}
         </div>
     );

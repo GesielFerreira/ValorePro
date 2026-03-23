@@ -220,6 +220,39 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
 
         audit.record('PAGE_LOADED', { url: page.url() }, await takeScreenshot(page));
 
+        // ── Step 1.5: Detect login wall ──────────────────────
+        const currentUrl = page.url().toLowerCase();
+        const pageContent = (await page.textContent('body') || '').toLowerCase();
+        const loginIndicators = [
+            '/login', '/signin', '/sign-in', '/entrar', '/identificacao',
+            '/registration', '/cadastro',
+        ];
+        const loginFormIndicators = [
+            'faça login', 'entre com', 'identifique-se', 'sign in',
+            'iniciar sessão', 'acesse sua conta',
+        ];
+
+        const isLoginPage = loginIndicators.some(p => currentUrl.includes(p)) ||
+            loginFormIndicators.some(t => pageContent.includes(t));
+
+        if (isLoginPage) {
+            audit.record('LOGIN_WALL_DETECTED', {
+                url: page.url(),
+                store: input.storeDomain,
+            }, await takeScreenshot(page));
+
+            audit.record('PURCHASE_CANCELLED', { reason: 'Store requires login' });
+
+            return {
+                result: failResult(
+                    'STORE_LOGIN_REQUIRED',
+                    `A loja ${input.storeName} exige login para finalizar a compra. Acesse ${input.productUrl}, faça login na sua conta e tente novamente pelo ValorePro.`,
+                    input.productUrl,
+                ),
+                audit,
+            };
+        }
+
         // ── Step 2: Verify current price ─────────────────────
 
         const priceText = await extractText(page, selectors.priceOnPage);

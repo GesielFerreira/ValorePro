@@ -26,6 +26,7 @@ export type PurchaseFailReason =
     | 'BLOCKED_BY_STORE'
     | 'CHECKOUT_ERROR'
     | 'NAVIGATION_ERROR'
+    | 'STORE_LOGIN_REQUIRED'
     | 'UNKNOWN';
 
 // ── Input ────────────────────────────────────────────────────
@@ -108,6 +109,7 @@ export type AuditAction =
     | 'ORDER_NUMBER_CAPTURED'
     | 'SCREENSHOT_TAKEN'
     | 'ERROR_OCCURRED'
+    | 'LOGIN_WALL_DETECTED'
     | 'PURCHASE_COMPLETED'
     | 'PURCHASE_FAILED'
     | 'PURCHASE_CANCELLED';

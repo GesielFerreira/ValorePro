@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ShieldCheck, Truck, CreditCard, Lock, CheckCircle2, Fingerprint, X, Loader2, MapPin, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Truck, CreditCard, Lock, CheckCircle2, Fingerprint, X, Loader2, MapPin, AlertTriangle, ScanFace } from 'lucide-react';
 import { TrustBadge } from '@/components/TrustBadge';
+import { FaceAuth } from '@/components/FaceAuth';
+import { FaceRegister } from '@/components/FaceRegister';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -55,6 +57,13 @@ function ConfirmContent() {
     const [confirmed, setConfirmed] = useState(false);
     const [purchaseResult, setPurchaseResult] = useState<any>(null);
     const [purchaseError, setPurchaseError] = useState<string | null>(null);
+
+    // Face ID state
+    const [faceDescriptor, setFaceDescriptor] = useState<number[] | null>(null);
+    const [hasFace, setHasFace] = useState(false);
+    const [loadingFace, setLoadingFace] = useState(true);
+    const [showFaceAuth, setShowFaceAuth] = useState(false);
+    const [showFaceRegister, setShowFaceRegister] = useState(false);
 
     // Reputation data
     const [trustScore, setTrustScore] = useState<number>(0);
@@ -180,6 +189,43 @@ function ConfirmContent() {
         }
 
         fetchUserData();
+    }, []);
+
+    // Fetch face descriptor
+    useEffect(() => {
+        async function fetchFace() {
+            try {
+                const res = await fetch('/api/face');
+                if (res.ok) {
+                    const data = await res.json();
+                    setHasFace(data.hasDescriptor);
+                    setFaceDescriptor(data.descriptor);
+                }
+            } catch { /* ignore */ } finally {
+                setLoadingFace(false);
+            }
+        }
+
+        fetchFace();
+    }, []);
+
+    // Trigger Face ID verification
+    const handleFaceAuth = useCallback(() => {
+        if (!card) {
+            toast.error('Adicione um cartão em Configurações antes de comprar.');
+            return;
+        }
+        if (!hasFace || !faceDescriptor) {
+            setShowFaceRegister(true);
+            return;
+        }
+        setShowFaceAuth(true);
+    }, [card, hasFace, faceDescriptor]);
+
+    // Handle face auth success — proceed to purchase
+    const handleFaceSuccess = useCallback(() => {
+        setShowFaceAuth(false);
+        handleConfirm();
     }, []);
 
     async function handleConfirm() {
@@ -440,13 +486,43 @@ function ConfirmContent() {
                 </motion.div>
             )}
 
+            {/* Face ID modals */}
+            {showFaceAuth && faceDescriptor && (
+                <FaceAuth
+                    storedDescriptor={faceDescriptor}
+                    onSuccess={handleFaceSuccess}
+                    onFail={() => {
+                        setShowFaceAuth(false);
+                        toast.error('Reconhecimento facial falhou. Tente novamente.');
+                    }}
+                    onCancel={() => setShowFaceAuth(false)}
+                />
+            )}
+
+            {showFaceRegister && (
+                <FaceRegister
+                    onComplete={async () => {
+                        setShowFaceRegister(false);
+                        // Reload face descriptor
+                        const res = await fetch('/api/face');
+                        if (res.ok) {
+                            const data = await res.json();
+                            setHasFace(data.hasDescriptor);
+                            setFaceDescriptor(data.descriptor);
+                        }
+                        toast.success('Face ID cadastrado! Agora confirme a compra.');
+                    }}
+                    onCancel={() => setShowFaceRegister(false)}
+                />
+            )}
+
             {/* Confirm button */}
             <motion.button
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                onClick={handleConfirm}
-                disabled={confirming || !card || loadingUser}
+                onClick={hasFace ? handleFaceAuth : handleFaceAuth}
+                disabled={confirming || !card || loadingUser || loadingFace}
                 className="w-full flex items-center justify-center gap-2 py-4 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-400 disabled:cursor-not-allowed text-white text-base font-bold rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-brand-500/30"
             >
                 {confirming ? (
@@ -454,16 +530,21 @@ function ConfirmContent() {
                         <Fingerprint size={20} className="animate-pulse" />
                         Processando compra...
                     </>
+                ) : hasFace ? (
+                    <>
+                        <ScanFace size={20} />
+                        Confirmar com Face ID · {formatCurrency(total)}
+                    </>
                 ) : (
                     <>
-                        <ShieldCheck size={20} />
-                        Confirmar Compra · {formatCurrency(total)}
+                        <ScanFace size={20} />
+                        Cadastrar Face ID e Comprar · {formatCurrency(total)}
                     </>
                 )}
             </motion.button>
 
             <p className="text-center text-[11px] text-surface-400 mt-3 flex items-center justify-center gap-1">
-                <Lock size={10} /> Compra protegida por tokenização PCI-DSS
+                <Lock size={10} /> Compra protegida por Face ID + tokenização PCI-DSS
             </p>
         </div>
     );
