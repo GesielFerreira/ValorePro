@@ -63,7 +63,7 @@ const ANGLE_GUIDES: AngleGuide[] = [
         label: 'Para baixo',
         instruction: 'Abaixe a cabeça',
         icon: '👇',
-        check: (a) => a.pitch > 0.15 && a.pitch < 0.9 && Math.abs(a.yaw) < 0.5,
+        check: (a) => a.pitch > 0.08 && a.pitch < 0.9 && Math.abs(a.yaw) < 0.6,
     },
 ];
 
