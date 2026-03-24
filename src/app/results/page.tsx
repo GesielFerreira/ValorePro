@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Loader2, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ProductCard } from '@/components/ProductCard';
@@ -141,6 +142,7 @@ function ResultsContent() {
                 if (res.status === 401) {
                     setNeedsLogin(true);
                     setError('Faça login para buscar produtos.');
+                    createClient().auth.signOut().catch(() => {});
                 } else if (res.status === 429 && data.upgrade) {
                     setNeedsUpgrade(true);
                     const noPlan = data.limit === 0;

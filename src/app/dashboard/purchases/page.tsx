@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingBag, RefreshCw, ChevronDown, Loader2, LogIn, PackageOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { TrustBadge } from '@/components/TrustBadge';
+import { DashboardSkeleton } from '@/components/Skeletons';
 
 interface Purchase {
     id: string;
@@ -35,7 +37,7 @@ export default function PurchasesPage() {
         async function load() {
             try {
                 const res = await fetch('/api/dashboard');
-                if (res.status === 401) { setNeedsLogin(true); return; }
+                if (res.status === 401) { setNeedsLogin(true); createClient().auth.signOut().catch(() => {}); return; }
                 if (res.ok) {
                     const data = await res.json();
                     setPurchases(data.recentPurchases || []);

@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, CreditCard, MapPin, Bell, Shield, Plus, Edit2, Lock, Loader2, LogIn, Save, X, Trash2, ScanFace, CheckCircle2, LogOut } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { FaceRegister } from '@/components/FaceRegister';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,7 +85,7 @@ export default function SettingsPage() {
         async function load() {
             try {
                 const res = await fetch('/api/user');
-                if (res.status === 401) { setNeedsLogin(true); return; }
+                if (res.status === 401) { setNeedsLogin(true); createClient().auth.signOut().catch(() => {}); return; }
                 if (res.ok) {
                     const data = await res.json();
                     setProfile(data.profile);

@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, BellOff, Trash2, Plus, Clock, Loader2, LogIn } from 'lucide-react';
+import { DashboardSkeleton } from '@/components/Skeletons';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -35,7 +37,7 @@ export default function AlertsPage() {
         async function load() {
             try {
                 const res = await fetch('/api/alerts');
-                if (res.status === 401) { setNeedsLogin(true); return; }
+                if (res.status === 401) { setNeedsLogin(true); createClient().auth.signOut().catch(() => {}); return; }
                 if (res.ok) {
                     const data = await res.json();
                     setAlerts(data.alerts || []);

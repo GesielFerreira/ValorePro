@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { TrendingDown, ShoppingBag, Bell, ChevronRight, Wallet, Loader2, LogIn, Search, Clock, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { DashboardSkeleton } from '@/components/Skeletons';
 
@@ -51,6 +52,7 @@ export default function DashboardPage() {
                 const res = await fetch('/api/dashboard');
                 if (res.status === 401) {
                     setNeedsLogin(true);
+                    createClient().auth.signOut().catch(() => {});
                     return;
                 }
                 if (res.ok) {

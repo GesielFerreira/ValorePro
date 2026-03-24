@@ -21,7 +21,7 @@ const NAV_ITEMS = [
 export function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
-    const { signOut } = useAuth();
+    const { user, loading, signOut } = useAuth();
     
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
@@ -58,6 +58,9 @@ export function Navbar() {
 
                 <nav className="flex items-center gap-1">
                     {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+                        // Se não estiver logado, não mostrar links do dashboard
+                        if (!user && !loading && href.startsWith('/dashboard')) return null;
+
                         const isActive = href === '/'
                             ? pathname === '/'
                             : href === '/dashboard'
@@ -85,35 +88,46 @@ export function Navbar() {
                 <div className="flex items-center gap-2">
                     <NotificationsDropdown />
                     
-                    <div className="relative ml-2" ref={userMenuRef}>
-                        <button 
-                            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                            className="flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors focus:outline-none"
-                        >
-                            <User size={18} className="text-brand-600" />
-                        </button>
-                        
-                        {isUserMenuOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-surface-100 py-1 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
-                                <Link 
-                                    href="/dashboard/settings" 
-                                    onClick={() => setIsUserMenuOpen(false)}
-                                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
-                                >
-                                    <User size={16} /> Meu Perfil
-                                </Link>
-                                <div className="h-px bg-surface-100 my-1"></div>
-                                <button 
-                                    onClick={handleSignOut}
-                                    disabled={isSigningOut}
-                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
-                                >
-                                    {isSigningOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
-                                    Sair da conta
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    {!loading && !user ? (
+                        <div className="flex items-center gap-2 ml-2">
+                            <Link href="/login" className="text-sm font-medium text-surface-600 hover:text-surface-900 transition-colors px-3 py-2">
+                                Entrar
+                            </Link>
+                            <Link href="/signup" className="text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors px-4 py-2 rounded-lg">
+                                Criar conta
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="relative ml-2" ref={userMenuRef}>
+                            <button 
+                                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                                className="flex items-center justify-center w-10 h-10 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors focus:outline-none"
+                            >
+                                <User size={18} className="text-brand-600" />
+                            </button>
+                            
+                            {isUserMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-surface-100 py-1 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                                    <Link 
+                                        href="/dashboard/settings" 
+                                        onClick={() => setIsUserMenuOpen(false)}
+                                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
+                                    >
+                                        <User size={16} /> Meu Perfil
+                                    </Link>
+                                    <div className="h-px bg-surface-100 my-1"></div>
+                                    <button 
+                                        onClick={handleSignOut}
+                                        disabled={isSigningOut}
+                                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                                    >
+                                        {isSigningOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
+                                        Sair da conta
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </header>
 
@@ -121,6 +135,8 @@ export function Navbar() {
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-surface-200 px-2 pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center justify-around overflow-x-auto">
                     {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+                        if (!user && !loading && href.startsWith('/dashboard')) return null;
+
                         const isActive = href === '/'
                             ? pathname === '/'
                             : href === '/dashboard'
@@ -147,13 +163,15 @@ export function Navbar() {
                         );
                     })}
                     {/* Logout for mobile menu */}
-                    <button
-                        onClick={handleSignOut}
-                        className="flex flex-col items-center gap-0.5 py-2 px-3 text-[11px] font-medium transition-all min-w-[56px] text-surface-400 hover:text-rose-500"
-                    >
-                        <LogOut size={22} strokeWidth={1.5} />
-                        <span>Sair</span>
-                    </button>
+                    {user && (
+                        <button
+                            onClick={handleSignOut}
+                            className="flex flex-col items-center gap-0.5 py-2 px-3 text-[11px] font-medium transition-all min-w-[56px] text-surface-400 hover:text-rose-500"
+                        >
+                            <LogOut size={22} strokeWidth={1.5} />
+                            <span>Sair</span>
+                        </button>
+                    )}
                 </div>
             </nav>
         </>
