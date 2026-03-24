@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Loader2, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -49,7 +49,7 @@ const LOADING_MESSAGES = [
     'Quase lá...',
 ];
 
-export default function ResultsPage() {
+function ResultsContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const query = searchParams.get('q') || '';
@@ -394,5 +394,17 @@ export default function ResultsPage() {
                 ))}
             </div>
         </div>
+    );
+}
+
+export default function ResultsPage() {
+    return (
+        <Suspense fallback={
+            <div className="max-w-2xl mx-auto px-4 pt-12 flex justify-center">
+                <Loader2 size={32} className="text-brand-500 animate-spin" />
+            </div>
+        }>
+            <ResultsContent />
+        </Suspense>
     );
 }
