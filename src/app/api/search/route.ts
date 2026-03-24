@@ -139,10 +139,14 @@ export async function POST(request: NextRequest) {
             }).eq('id', search.id);
 
             // Increment daily search count ONLY if it was a real search (costs credits)
-            if (!result.isCached) {
+            if (!result.isCached && result.status !== 'failed') {
                 await admin.from('users').update({
                     searches_today: profile.searches_today + 1,
                 }).eq('id', profile.id);
+            }
+
+            if (result.status === 'failed' && result.results.length === 0) {
+                throw { status: 500, message: 'Os provedores de busca falharam. Verifique os limites de API ou chaves no Vercel.' };
             }
 
             // Get user's name for AI voice personalization
