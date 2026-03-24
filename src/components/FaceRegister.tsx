@@ -126,19 +126,20 @@ export function FaceRegister({ onComplete, onCancel }: FaceRegisterProps) {
         return () => { cancelled = true; stopCamera(); };
     }, [stopCamera]);
 
-    // Real-time face tracking loop
     useEffect(() => {
         if (step !== 'ready' || !videoRef.current) return;
 
+        let cancelled = false;
         let holdStart = 0;
         let lastSamplesLen = samples.length;
         let currentIdx = currentAngleIdx;
         const guide = ANGLE_GUIDES[currentIdx];
 
         async function detectLoop() {
-            if (!videoRef.current || !streamRef.current) return;
+            if (cancelled || !videoRef.current || !streamRef.current) return;
 
             const result = await detectFaceWithLandmarks(videoRef.current);
+            if (cancelled) return; // Prevent race conditions after await
 
             if (result && guide.check(result.angle)) {
                 if (holdStart === 0) holdStart = Date.now();
@@ -194,12 +195,18 @@ export function FaceRegister({ onComplete, onCancel }: FaceRegisterProps) {
                     }
                 }
             } else {
-                holdStart = 0;
+                // If the face drops for a split second, DO NOT instantly reset the timer.
+                // Just pause the progress visually but let the timer decay slowly.
+                if (holdStart > 0) {
+                    // Add penalty of 100ms per dropped frame, but never push holdStart into the future
+                    holdStart = Math.min(Date.now(), holdStart + 100); 
+                }
                 setIsAligned(false);
-                setHoldProgress(0);
             }
 
-            animFrameRef.current = requestAnimationFrame(detectLoop);
+            if (!cancelled) {
+                animFrameRef.current = requestAnimationFrame(detectLoop);
+            }
         }
 
         // Start detection loop with throttle
@@ -217,6 +224,7 @@ export function FaceRegister({ onComplete, onCancel }: FaceRegisterProps) {
         throttledLoop();
 
         return () => {
+            cancelled = true;
             if (animFrameRef.current) {
                 cancelAnimationFrame(animFrameRef.current);
             }
