@@ -59,13 +59,13 @@ async function fetchMeliApi<T>(url: string): Promise<T | null> {
 
         if (!res.ok) {
             log.error(`MeLi API error: ${res.status}`, { url });
-            return null;
+            throw new Error(`MercadoLivre API HTTP ${res.status}`);
         }
 
         return res.json() as Promise<T>;
     } catch (err) {
         log.error('MeLi API request failed', { error: String(err), url });
-        return null;
+        throw err;
     }
 }
 

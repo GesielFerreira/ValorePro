@@ -178,7 +178,7 @@ export async function searchSerpApi(options: SerpSearchOptions): Promise<{
 
     if (!process.env.SERPAPI_KEY) {
         log.error('SERPAPI_KEY not configured');
-        return { products: [], scrapableUrls: [] };
+        throw new Error('SERPAPI_KEY is missing in environment variables. Configure no painel do Vercel.');
     }
 
     const products: RawProductResult[] = [];
