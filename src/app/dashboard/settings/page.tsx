@@ -49,6 +49,7 @@ interface UserAddress {
 
 export default function SettingsPage() {
     const router = useRouter();
+    const { signOut } = useAuth();
     const [activeTab, setActiveTab] = useState<'profile' | 'cards' | 'address' | 'notifications' | 'security'>('profile');
     const [loading, setLoading] = useState(true);
     const [needsLogin, setNeedsLogin] = useState(false);
@@ -335,7 +336,6 @@ export default function SettingsPage() {
     const inputClass = 'w-full text-sm text-surface-800 border border-surface-300 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition-all';
     const labelClass = 'block text-xs font-medium text-surface-500 mb-1';
 
-    const { signOut } = useAuth();
     const handleSignOut = async () => {
         try {
             await signOut();
