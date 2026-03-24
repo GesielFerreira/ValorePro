@@ -102,59 +102,37 @@ function ConfirmContent() {
 
                 if (res.ok) {
                     const data = await res.json();
-                    setTrustScore(data.trustScore || 0);
+                    const score = data.trust_score ?? 0;
+                    setTrustScore(score);
 
-                    // Build score details from reputation data
-                    const details: ScoreDetail[] = [];
-                    if (data.checks) {
-                        if (data.checks.cnpj !== undefined) {
-                            details.push({
-                                label: 'CNPJ ativo',
-                                value: '+25',
-                                ok: data.checks.cnpj?.valid === true,
-                            });
-                        }
-                        if (data.checks.domain !== undefined) {
-                            details.push({
-                                label: 'Domínio > 2 anos',
-                                value: '+20',
-                                ok: (data.checks.domain?.ageYears || 0) >= 2,
-                            });
-                        }
-                        if (data.checks.ssl !== undefined) {
-                            details.push({
-                                label: 'SSL válido',
-                                value: '+15',
-                                ok: data.checks.ssl === true,
-                            });
-                        }
-                        if (data.checks.reclameAqui !== undefined) {
-                            details.push({
-                                label: 'Reclame Aqui ≥ 7',
-                                value: '+25',
-                                ok: (data.checks.reclameAqui?.score || 0) >= 7,
-                            });
-                        }
-                        if (data.checks.google !== undefined) {
-                            details.push({
-                                label: 'Google ≥ 4★',
-                                value: '+15',
-                                ok: (data.checks.google?.rating || 0) >= 4,
-                            });
-                        }
-                    }
-
-                    // Fallback if no detailed checks — use trustScore to build approximate details
-                    if (details.length === 0) {
-                        const score = data.trustScore || 0;
-                        details.push(
-                            { label: 'CNPJ ativo', value: '+25', ok: score >= 25 },
-                            { label: 'Domínio > 2 anos', value: '+20', ok: score >= 45 },
-                            { label: 'SSL válido', value: '+15', ok: score >= 60 },
-                            { label: 'Reclame Aqui ≥ 7', value: '+25', ok: score >= 75 },
-                            { label: 'Google ≥ 4★', value: '+15', ok: score >= 85 },
-                        );
-                    }
+                    // Build score details from flat DB fields returned by the API
+                    const details: ScoreDetail[] = [
+                        {
+                            label: 'CNPJ ativo',
+                            value: '+25',
+                            ok: data.cnpj_status === 'ATIVA',
+                        },
+                        {
+                            label: 'Domínio > 2 anos',
+                            value: '+20',
+                            ok: (data.domain_age_years ?? 0) >= 2,
+                        },
+                        {
+                            label: 'SSL válido',
+                            value: '+15',
+                            ok: data.ssl_valid === true,
+                        },
+                        {
+                            label: 'Reclame Aqui ≥ 7',
+                            value: '+25',
+                            ok: (data.reclame_aqui_score ?? 0) >= 7,
+                        },
+                        {
+                            label: 'Google ≥ 4★',
+                            value: '+15',
+                            ok: (data.google_rating ?? 0) >= 4,
+                        },
+                    ];
 
                     setScoreDetails(details);
                 }

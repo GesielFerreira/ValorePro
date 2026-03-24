@@ -79,6 +79,49 @@ export function useAuth() {
     );
 
     const signInWithGoogle = useCallback(async () => {
+        const isStandalone =
+            window.matchMedia('(display-mode: standalone)').matches ||
+            (navigator as any).standalone === true;
+
+        if (isStandalone) {
+            // PWA standalone: use popup to keep session within the app
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                    skipBrowserRedirect: true,
+                },
+            });
+            if (error) throw error;
+
+            if (data?.url) {
+                const popup = window.open(data.url, '_blank', 'width=500,height=600');
+
+                // Poll for session completion
+                return new Promise<typeof data>((resolve, reject) => {
+                    const interval = setInterval(async () => {
+                        try {
+                            const { data: sessionData } = await supabase.auth.getSession();
+                            if (sessionData?.session) {
+                                clearInterval(interval);
+                                popup?.close();
+                                resolve(data);
+                            }
+                        } catch { /* keep polling */ }
+                    }, 1000);
+
+                    // Timeout after 2 minutes
+                    setTimeout(() => {
+                        clearInterval(interval);
+                        popup?.close();
+                        reject(new Error('Login timeout. Tente novamente.'));
+                    }, 120_000);
+                });
+            }
+            return data;
+        }
+
+        // Normal browser: standard redirect flow
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
