@@ -26,7 +26,7 @@ export async function extractDescriptor(
     input: HTMLVideoElement | HTMLCanvasElement | HTMLImageElement,
 ): Promise<Float32Array | null> {
     const detection = await faceapi
-        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -56,7 +56,7 @@ export async function detectFaceWithLandmarks(
     input: HTMLVideoElement | HTMLCanvasElement | HTMLImageElement,
 ): Promise<{ descriptor: Float32Array; angle: FaceAngle } | null> {
     const detection = await faceapi
-        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
 

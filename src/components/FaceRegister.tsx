@@ -35,35 +35,35 @@ const ANGLE_GUIDES: AngleGuide[] = [
         label: 'Frontal',
         instruction: 'Rosto no centro',
         icon: '👤',
-        check: (a) => Math.abs(a.yaw) < 0.25 && Math.abs(a.pitch) < 0.25,
+        check: (a) => Math.abs(a.yaw) < 0.4 && Math.abs(a.pitch) < 0.4,
     },
     {
         id: 'right', // User turns right -> nose moves left -> yaw < 0
         label: 'Direita',
         instruction: 'Vire para a DIREITA',
         icon: '👉',
-        check: (a) => a.yaw < -0.25 && a.yaw > -0.8 && Math.abs(a.pitch) < 0.4,
+        check: (a) => a.yaw < -0.15 && a.yaw > -0.9 && Math.abs(a.pitch) < 0.5,
     },
     {
         id: 'left', // User turns left -> nose moves right -> yaw > 0
         label: 'Esquerda',
         instruction: 'Vire para a ESQUERDA',
         icon: '👈',
-        check: (a) => a.yaw > 0.25 && a.yaw < 0.8 && Math.abs(a.pitch) < 0.4,
+        check: (a) => a.yaw > 0.15 && a.yaw < 0.9 && Math.abs(a.pitch) < 0.5,
     },
     {
         id: 'up',
         label: 'Para cima',
         instruction: 'Levante a cabeça',
         icon: '👆',
-        check: (a) => a.pitch < -0.2 && a.pitch > -0.8 && Math.abs(a.yaw) < 0.4,
+        check: (a) => a.pitch < -0.15 && a.pitch > -0.9 && Math.abs(a.yaw) < 0.5,
     },
     {
         id: 'down',
         label: 'Para baixo',
         instruction: 'Abaixe a cabeça',
         icon: '👇',
-        check: (a) => a.pitch > 0.2 && a.pitch < 0.8 && Math.abs(a.yaw) < 0.4,
+        check: (a) => a.pitch > 0.15 && a.pitch < 0.9 && Math.abs(a.yaw) < 0.5,
     },
 ];
 
@@ -81,7 +81,7 @@ export function FaceRegister({ onComplete, onCancel }: FaceRegisterProps) {
     const [holdProgress, setHoldProgress] = useState(0);
 
     const TOTAL_ANGLES = ANGLE_GUIDES.length;
-    const HOLD_DURATION = 800; // ms to hold position before capture
+    const HOLD_DURATION = 400; // ms to hold position before capture
 
     const currentGuide = ANGLE_GUIDES[currentAngleIdx];
 
