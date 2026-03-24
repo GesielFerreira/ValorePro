@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, CheckCircle2, User, RefreshCw } from 'lucide-react';
+import { X, Loader2, CheckCircle2, User, RefreshCw, ArrowRight, ArrowLeft, ArrowUp, ArrowDown } from 'lucide-react';
 import { loadFaceModels, detectFaceWithLandmarks, descriptorToArray, type FaceAngle } from '@/lib/face-utils';
 import { toast } from 'sonner';
 
@@ -33,37 +33,37 @@ const ANGLE_GUIDES: AngleGuide[] = [
     {
         id: 'front',
         label: 'Frontal',
-        instruction: 'Olhe diretamente para a câmera',
+        instruction: 'Rosto no centro',
         icon: '👤',
-        check: (a) => Math.abs(a.yaw) < 0.2 && Math.abs(a.pitch) < 0.25,
+        check: (a) => Math.abs(a.yaw) < 0.25 && Math.abs(a.pitch) < 0.25,
     },
     {
-        id: 'left',
-        label: 'Esquerda',
-        instruction: 'Vire levemente para a esquerda',
-        icon: '👈',
-        check: (a) => a.yaw < -0.2 && a.yaw > -0.7 && Math.abs(a.pitch) < 0.35,
-    },
-    {
-        id: 'right',
+        id: 'right', // User turns right -> nose moves left -> yaw < 0
         label: 'Direita',
-        instruction: 'Vire levemente para a direita',
+        instruction: 'Vire para a DIREITA',
         icon: '👉',
-        check: (a) => a.yaw > 0.2 && a.yaw < 0.7 && Math.abs(a.pitch) < 0.35,
+        check: (a) => a.yaw < -0.25 && a.yaw > -0.8 && Math.abs(a.pitch) < 0.4,
+    },
+    {
+        id: 'left', // User turns left -> nose moves right -> yaw > 0
+        label: 'Esquerda',
+        instruction: 'Vire para a ESQUERDA',
+        icon: '👈',
+        check: (a) => a.yaw > 0.25 && a.yaw < 0.8 && Math.abs(a.pitch) < 0.4,
     },
     {
         id: 'up',
         label: 'Para cima',
-        instruction: 'Levante levemente o queixo',
+        instruction: 'Levante a cabeça',
         icon: '👆',
-        check: (a) => a.pitch < -0.15 && a.pitch > -0.6 && Math.abs(a.yaw) < 0.35,
+        check: (a) => a.pitch < -0.2 && a.pitch > -0.8 && Math.abs(a.yaw) < 0.4,
     },
     {
         id: 'down',
         label: 'Para baixo',
-        instruction: 'Abaixe levemente o queixo',
+        instruction: 'Abaixe a cabeça',
         icon: '👇',
-        check: (a) => a.pitch > 0.15 && a.pitch < 0.6 && Math.abs(a.yaw) < 0.35,
+        check: (a) => a.pitch > 0.2 && a.pitch < 0.8 && Math.abs(a.yaw) < 0.4,
     },
 ];
 
@@ -81,7 +81,7 @@ export function FaceRegister({ onComplete, onCancel }: FaceRegisterProps) {
     const [holdProgress, setHoldProgress] = useState(0);
 
     const TOTAL_ANGLES = ANGLE_GUIDES.length;
-    const HOLD_DURATION = 1200; // ms to hold position before capture
+    const HOLD_DURATION = 800; // ms to hold position before capture
 
     const currentGuide = ANGLE_GUIDES[currentAngleIdx];
 
@@ -324,17 +324,43 @@ export function FaceRegister({ onComplete, onCancel }: FaceRegisterProps) {
                             ))}
                         </div>
 
-                        {/* Direction indicator arrow */}
+                        {/* Direction indicator arrow animations */}
+                        {step === 'ready' && !isAligned && (
+                            <AnimatePresence>
+                                {currentGuide.id === 'right' && (
+                                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 0.9, x: [0, 20, 0] }} exit={{ opacity: 0 }} transition={{ repeat: Infinity, duration: 1.2 }} className="absolute inset-y-0 right-8 flex items-center shadow-black drop-shadow-2xl">
+                                        <ArrowRight size={80} strokeWidth={3} className="text-white drop-shadow-2xl" />
+                                    </motion.div>
+                                )}
+                                {currentGuide.id === 'left' && (
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 0.9, x: [0, -20, 0] }} exit={{ opacity: 0 }} transition={{ repeat: Infinity, duration: 1.2 }} className="absolute inset-y-0 left-8 flex items-center shadow-black drop-shadow-2xl">
+                                        <ArrowLeft size={80} strokeWidth={3} className="text-white drop-shadow-2xl" />
+                                    </motion.div>
+                                )}
+                                {currentGuide.id === 'up' && (
+                                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 0.9, y: [0, -20, 0] }} exit={{ opacity: 0 }} transition={{ repeat: Infinity, duration: 1.2 }} className="absolute inset-x-0 top-8 flex justify-center shadow-black drop-shadow-2xl">
+                                        <ArrowUp size={80} strokeWidth={3} className="text-white drop-shadow-2xl" />
+                                    </motion.div>
+                                )}
+                                {currentGuide.id === 'down' && (
+                                    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 0.9, y: [0, 20, 0] }} exit={{ opacity: 0 }} transition={{ repeat: Infinity, duration: 1.2 }} className="absolute inset-x-0 bottom-24 flex justify-center shadow-black drop-shadow-2xl">
+                                        <ArrowDown size={80} strokeWidth={3} className="text-white drop-shadow-2xl" />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        )}
+
+                        {/* Enhanced Bottom Label */}
                         {step === 'ready' && (
                             <motion.div
                                 key={currentGuide?.id}
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full"
+                                className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 shadow-2xl"
                             >
-                                <div className="flex items-center gap-2 text-white">
-                                    <span className="text-lg">{currentGuide?.icon}</span>
-                                    <span className="text-sm font-medium">{currentGuide?.label}</span>
+                                <div className="flex items-center gap-3 text-white">
+                                    <span className="text-2xl">{currentGuide?.icon}</span>
+                                    <span className="text-base font-bold tracking-wide">{currentGuide?.instruction}</span>
                                 </div>
                             </motion.div>
                         )}
