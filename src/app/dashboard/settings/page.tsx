@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, CreditCard, MapPin, Bell, Shield, Plus, Edit2, Lock, Loader2, LogIn, Save, X, Trash2, ScanFace, CheckCircle2 } from 'lucide-react';
+import { User, CreditCard, MapPin, Bell, Shield, Plus, Edit2, Lock, Loader2, LogIn, Save, X, Trash2, ScanFace, CheckCircle2, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { FaceRegister } from '@/components/FaceRegister';
+import { useAuth } from '@/hooks/useAuth';
 
 interface UserProfile {
     name: string;
@@ -334,6 +335,14 @@ export default function SettingsPage() {
     const inputClass = 'w-full text-sm text-surface-800 border border-surface-300 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition-all';
     const labelClass = 'block text-xs font-medium text-surface-500 mb-1';
 
+    const { signOut } = useAuth();
+    const handleSignOut = async () => {
+        try {
+            await signOut();
+            router.push('/login');
+        } catch {}
+    };
+
     return (
         <div className="max-w-2xl mx-auto px-4 pt-6 pb-8">
             <h1 className="text-xl font-bold text-surface-900 mb-6">Configurações</h1>
@@ -430,6 +439,16 @@ export default function SettingsPage() {
                                 {profile.plan === 'free' ? 'Ativar Plano' : 'Mudar Plano'}
                             </button>
                         </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-center">
+                        <button
+                            onClick={handleSignOut}
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors font-medium text-sm"
+                        >
+                            <LogOut size={16} />
+                            Sair da conta
+                        </button>
                     </div>
                 </motion.div>
             )}
