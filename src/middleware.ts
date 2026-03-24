@@ -16,8 +16,8 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico, sitemap.xml, robots.txt (metadata files)
-         * - api (API routes, they handle their own auth)
+         * API routes ARE included so auth tokens get refreshed in PWA mode
          */
-        '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 };
