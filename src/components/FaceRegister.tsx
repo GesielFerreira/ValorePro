@@ -35,35 +35,35 @@ const ANGLE_GUIDES: AngleGuide[] = [
         label: 'Frontal',
         instruction: 'Rosto no centro',
         icon: '👤',
-        check: (a) => Math.abs(a.yaw) < 0.4 && Math.abs(a.pitch) < 0.4,
+        check: (a) => Math.abs(a.yaw) < 0.6 && Math.abs(a.pitch) < 0.6,
     },
     {
         id: 'right', // User turns right -> nose moves left -> yaw < 0
         label: 'Direita',
         instruction: 'Vire para a DIREITA',
         icon: '👉',
-        check: (a) => a.yaw < -0.15 && a.yaw > -0.9 && Math.abs(a.pitch) < 0.5,
+        check: (a) => a.yaw < 0.05 && Math.abs(a.pitch) < 0.8,
     },
     {
         id: 'left', // User turns left -> nose moves right -> yaw > 0
         label: 'Esquerda',
         instruction: 'Vire para a ESQUERDA',
         icon: '👈',
-        check: (a) => a.yaw > 0.15 && a.yaw < 0.9 && Math.abs(a.pitch) < 0.5,
+        check: (a) => a.yaw > -0.05 && Math.abs(a.pitch) < 0.8,
     },
     {
         id: 'up',
         label: 'Para cima',
         instruction: 'Levante a cabeça',
         icon: '👆',
-        check: (a) => a.pitch < -0.15 && a.pitch > -0.9 && Math.abs(a.yaw) < 0.5,
+        check: (a) => a.pitch < 0.1 && Math.abs(a.yaw) < 0.8,
     },
     {
         id: 'down',
         label: 'Para baixo',
         instruction: 'Abaixe a cabeça',
         icon: '👇',
-        check: (a) => a.pitch > 0.08 && a.pitch < 0.9 && Math.abs(a.yaw) < 0.6,
+        check: (a) => a.pitch > -0.2 && Math.abs(a.yaw) < 0.8,
     },
 ];
 
