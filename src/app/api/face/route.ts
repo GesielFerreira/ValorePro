@@ -20,7 +20,7 @@ export async function GET() {
     const { data, error } = await admin
         .from('users')
         .select('face_descriptor')
-        .eq('id', user.id)
+        .eq('auth_id', user.id)
         .single() as { data: { face_descriptor: number[] | null } | null; error: unknown };
 
     if (error) {
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     const { error } = await admin
         .from('users')
         .update({ face_descriptor: descriptor } as Record<string, unknown>)
-        .eq('id', user.id);
+        .eq('auth_id', user.id);
 
     if (error) {
         return NextResponse.json({ error: 'Erro ao salvar Face ID' }, { status: 500 });
@@ -83,7 +83,7 @@ export async function DELETE() {
     const { error } = await admin
         .from('users')
         .update({ face_descriptor: null } as Record<string, unknown>)
-        .eq('id', user.id);
+        .eq('auth_id', user.id);
 
     if (error) {
         return NextResponse.json({ error: 'Erro ao remover Face ID' }, { status: 500 });
