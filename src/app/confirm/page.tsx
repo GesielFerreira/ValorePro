@@ -201,10 +201,10 @@ function ConfirmContent() {
     }, [card, hasFace, faceDescriptor]);
 
     // Handle face auth success — proceed to purchase
-    const handleFaceSuccess = useCallback(() => {
+    const handleFaceSuccess = () => {
         setShowFaceAuth(false);
         handleConfirm();
-    }, []);
+    };
 
     async function handleConfirm() {
         if (!resultId) {
