@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
 
             // Save results to database
             const resultsToInsert = result.results.slice(0, 30).map((r, i) => ({
+                id: r.id,
                 search_id: search.id,
                 title: r.title,
                 cash_price: r.cashPrice,

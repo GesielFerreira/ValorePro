@@ -6,16 +6,14 @@
 // and calculates total price (product + shipping).
 // ============================================================
 
+import { randomUUID } from 'crypto';
 import { createLogger } from '@/lib/logger';
 import type { RawProductResult, NormalizedResult } from '@/types/search';
 
 const log = createLogger('normalizer');
 
 function generateResultId(result: RawProductResult): string {
-    const domain = extractDomain(result.url);
-    const priceStr = result.price.toFixed(2);
-    const hash = simpleHash(`${domain}-${result.title}-${priceStr}`);
-    return `res_${hash}`;
+    return randomUUID();
 }
 
 function simpleHash(str: string): string {
