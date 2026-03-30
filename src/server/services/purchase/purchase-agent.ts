@@ -136,14 +136,128 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         const page = await context.newPage();
         page.setDefaultTimeout(STEP_TIMEOUT);
 
-        // ── Step 1: Navigate to product page ─────────────────
+        // ── Step 0: Resolve actual product URL ───────────────
+        // Google Shopping often returns redirect URLs instead of
+        // direct store links. We must resolve to the actual store page.
 
-        await page.goto(input.productUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+        let targetUrl = input.productUrl;
+
+        // Check if URL is a Google redirect/shopping page
+        try {
+            const parsedUrl = new URL(targetUrl);
+            const isGoogleUrl = parsedUrl.hostname.includes('google.com');
+
+            if (isGoogleUrl) {
+                audit.record('GOOGLE_REDIRECT_DETECTED', { originalUrl: targetUrl });
+
+                // Try to extract direct URL from query params first
+                const directUrl = parsedUrl.searchParams.get('url')
+                    || parsedUrl.searchParams.get('q')
+                    || parsedUrl.searchParams.get('adurl');
+
+                if (directUrl && directUrl.startsWith('http') && !directUrl.includes('google.com')) {
+                    targetUrl = directUrl;
+                    log.info('Extracted direct URL from Google params', { targetUrl });
+                } else {
+                    // Navigate to Google page and follow redirect to store
+                    log.info('Navigating to Google page to follow redirect...');
+                    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+                    await humanDelay(2000, 4000);
+
+                    // Check if we landed on the store or still on Google
+                    const landedUrl = page.url();
+                    const landedOnGoogle = landedUrl.includes('google.com');
+
+                    if (landedOnGoogle) {
+                        // Try to find and click the store link on Google Shopping page
+                        const storeLinks = [
+                            `a[href*="${input.storeDomain}"]`,
+                            'a[data-merchant-url]',
+                            'a.shntl',  // Google Shopping store link class
+                            'a[data-offer-url]',
+                            'a.pla-unit-title-link',
+                            'a[jsname]',
+                        ];
+
+                        let clickedStoreLink = false;
+                        for (const sel of storeLinks) {
+                            try {
+                                const links = await page.$$(sel);
+                                for (const link of links) {
+                                    const href = await link.getAttribute('href');
+                                    if (href && !href.includes('google.com') && href.startsWith('http')) {
+                                        targetUrl = href;
+                                        clickedStoreLink = true;
+                                        break;
+                                    }
+                                }
+                                if (clickedStoreLink) break;
+                            } catch { continue; }
+                        }
+
+                        // Fallback: try getting any external link from the page
+                        if (!clickedStoreLink) {
+                            const allLinks = await page.$$eval('a[href]', (anchors) =>
+                                anchors
+                                    .map((a) => a.getAttribute('href'))
+                                    .filter((h): h is string =>
+                                        !!h && h.startsWith('http') && !h.includes('google.com')
+                                    )
+                            );
+
+                            // Prefer links matching the expected store domain
+                            const storeLink = allLinks.find(l => l.includes(input.storeDomain))
+                                || allLinks[0];
+
+                            if (storeLink) {
+                                targetUrl = storeLink;
+                                clickedStoreLink = true;
+                            }
+                        }
+
+                        if (!clickedStoreLink) {
+                            audit.record('GOOGLE_REDIRECT_FAILED', {
+                                url: landedUrl,
+                                store: input.storeDomain,
+                            }, await takeScreenshot(page));
+
+                            return {
+                                result: failResult(
+                                    'CHECKOUT_ERROR',
+                                    `Não foi possível encontrar o link direto para ${input.storeName}. O produto pode não estar mais disponível nesta loja. Tente comprar manualmente.`,
+                                    input.productUrl,
+                                ),
+                                audit,
+                            };
+                        }
+
+                        audit.record('STORE_URL_RESOLVED', {
+                            from: input.productUrl.slice(0, 100),
+                            to: targetUrl.slice(0, 100),
+                        });
+                    } else {
+                        // Redirect resolved automatically
+                        targetUrl = landedUrl;
+                        audit.record('REDIRECT_AUTO_RESOLVED', { finalUrl: targetUrl });
+                    }
+                }
+            }
+        } catch (urlErr) {
+            log.warn('URL resolution failed, using original', { error: String(urlErr) });
+        }
+
+        // ── Step 1: Navigate to actual product page ──────────
+
+        // Only navigate if we haven't already loaded the correct page
+        const currentPageUrl = page.url();
+        if (!currentPageUrl.includes(input.storeDomain) || currentPageUrl === 'about:blank') {
+            await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+        }
 
         // Human-like: wait for page to settle + simulate reading
         await humanDelay(2000, 4000);
 
-        audit.record('PAGE_LOADED', { url: page.url() }, await takeScreenshot(page));
+        audit.record('PAGE_LOADED', { url: page.url(), resolvedFrom: input.productUrl !== targetUrl ? input.productUrl : undefined }, await takeScreenshot(page));
 
         // Dismiss any cookie banners or popups
         await dismissPopups(page);
