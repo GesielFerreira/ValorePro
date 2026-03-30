@@ -494,13 +494,13 @@ function ConfirmContent() {
                 />
             )}
 
-            {/* Confirm button */}
+            {/* Confirm button — Face ID disabled temporarily, call handleConfirm directly */}
             <motion.button
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                onClick={hasFace ? handleFaceAuth : handleFaceAuth}
-                disabled={confirming || !card || loadingUser || loadingFace}
+                onClick={handleConfirm}
+                disabled={confirming || !card || loadingUser}
                 className="w-full flex items-center justify-center gap-2 py-4 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-400 disabled:cursor-not-allowed text-white text-base font-bold rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-brand-500/30"
             >
                 {confirming ? (
@@ -508,21 +508,16 @@ function ConfirmContent() {
                         <Fingerprint size={20} className="animate-pulse" />
                         Processando compra...
                     </>
-                ) : hasFace ? (
-                    <>
-                        <ScanFace size={20} />
-                        Confirmar com Face ID · {formatCurrency(total)}
-                    </>
                 ) : (
                     <>
-                        <ScanFace size={20} />
-                        Cadastrar Face ID e Comprar · {formatCurrency(total)}
+                        <ShieldCheck size={20} />
+                        Confirmar Compra · {formatCurrency(total)}
                     </>
                 )}
             </motion.button>
 
             <p className="text-center text-[11px] text-surface-400 mt-3 flex items-center justify-center gap-1">
-                <Lock size={10} /> Compra protegida por Face ID + tokenização PCI-DSS
+                <Lock size={10} /> Compra protegida por tokenização PCI-DSS
             </p>
         </div>
     );

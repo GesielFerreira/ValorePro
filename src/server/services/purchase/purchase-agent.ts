@@ -1,7 +1,9 @@
 // ============================================================
-// ValorePro — Automated Purchase Agent (Playwright)
+// ValorePro — Automated Purchase Agent (Stealth Playwright)
 // ============================================================
 // Headless browser agent that executes e-commerce purchases.
+// Uses stealth browser + human-like behavior to bypass anti-bot.
+//
 // SAFETY: Requires explicit confirmacao === true to execute.
 // Every action is logged to an immutable audit trail.
 // ============================================================
@@ -9,21 +11,28 @@
 import { createLogger } from '@/lib/logger';
 import { PurchaseAuditLog } from './audit-logger';
 import { getSelectorsForStore } from './store-strategies';
-import type { Page, Browser, BrowserContext } from 'playwright';
+import {
+    launchStealthBrowser,
+    createHumanContext,
+    humanDelay,
+    humanFindAndClick,
+    humanFillField,
+    humanScroll,
+    dismissPopups,
+} from './stealth-browser';
+import type { Page, Browser } from 'playwright';
 import type {
     PurchaseInput,
     PurchaseResult,
     PurchaseSuccess,
     PurchaseFailure,
     PurchaseFailReason,
-    StoreSelectors,
 } from '@/types/purchase';
 
 const log = createLogger('purchase-agent');
 
-const PURCHASE_TIMEOUT = 120_000;   // 2 minutes total
-const STEP_TIMEOUT = 15_000;        // 15s per step
-const PRICE_TOLERANCE = 0.05;       // 5% tolerance for price comparison
+const STEP_TIMEOUT = 15_000;
+const PRICE_TOLERANCE = 0.05;
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -47,10 +56,6 @@ function generatePurchaseId(): string {
     return `pur_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function delay(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
-}
-
 function failResult(reason: PurchaseFailReason, message: string, url: string, price?: number): PurchaseFailure {
     return {
         sucesso: false,
@@ -60,77 +65,6 @@ function failResult(reason: PurchaseFailReason, message: string, url: string, pr
         precoAtual: price,
         timestamp: new Date(),
     };
-}
-
-// ── Selector Finder ──────────────────────────────────────────
-
-async function findAndClick(page: Page, selectors: string[], description: string): Promise<boolean> {
-    for (const selector of selectors) {
-        try {
-            const el = await page.$(selector);
-            if (el) {
-                const isVisible = await el.isVisible();
-                if (isVisible) {
-                    await el.scrollIntoViewIfNeeded();
-                    await delay(300);
-                    await el.click();
-                    return true;
-                }
-            }
-        } catch {
-            continue;
-        }
-    }
-
-    // Fallback: text-based search for common Brazilian button labels
-    const textFallbacks = description === 'add-to-cart'
-        ? ['Comprar', 'Adicionar ao carrinho', 'Adicionar', 'Compre agora']
-        : description === 'checkout'
-            ? ['Finalizar compra', 'Fechar pedido', 'Ir para pagamento', 'Finalizar']
-            : description === 'confirm'
-                ? ['Finalizar pedido', 'Confirmar compra', 'Pagar', 'Concluir pedido']
-                : [];
-
-    for (const text of textFallbacks) {
-        try {
-            const btn = page.getByRole('button', { name: text, exact: false });
-            if (await btn.isVisible({ timeout: 2000 })) {
-                await btn.click();
-                return true;
-            }
-        } catch {
-            continue;
-        }
-
-        try {
-            const link = page.getByRole('link', { name: text, exact: false });
-            if (await link.isVisible({ timeout: 1000 })) {
-                await link.click();
-                return true;
-            }
-        } catch {
-            continue;
-        }
-    }
-
-    return false;
-}
-
-async function fillField(page: Page, selectors: string[], value: string): Promise<boolean> {
-    for (const selector of selectors) {
-        try {
-            const el = await page.$(selector);
-            if (el && await el.isVisible()) {
-                await el.scrollIntoViewIfNeeded();
-                await el.click();
-                await el.fill(value);
-                return true;
-            }
-        } catch {
-            continue;
-        }
-    }
-    return false;
 }
 
 async function extractText(page: Page, selectors: string[]): Promise<string | null> {
@@ -191,34 +125,33 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
 
     audit.record('CONFIRMATION_VALIDATED', { confirmacao: true });
 
-    // Launch browser
+    // Launch stealth browser
     let browser: Browser | null = null;
 
     try {
-        const pw = await import('playwright');
-        browser = await pw.chromium.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-        });
+        browser = await launchStealthBrowser();
+        audit.record('BROWSER_OPENED', { headless: true, stealth: true });
 
-        audit.record('BROWSER_OPENED', { headless: true });
-
-        const context = await browser.newContext({
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
-            viewport: { width: 1366, height: 768 },
-            locale: 'pt-BR',
-            timezoneId: 'America/Sao_Paulo',
-        });
-
+        const context = await createHumanContext(browser);
         const page = await context.newPage();
         page.setDefaultTimeout(STEP_TIMEOUT);
 
         // ── Step 1: Navigate to product page ─────────────────
 
         await page.goto(input.productUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-        await delay(2000);
+
+        // Human-like: wait for page to settle + simulate reading
+        await humanDelay(2000, 4000);
 
         audit.record('PAGE_LOADED', { url: page.url() }, await takeScreenshot(page));
+
+        // Dismiss any cookie banners or popups
+        await dismissPopups(page);
+        await humanDelay(500, 1000);
+
+        // Simulate natural browsing — scroll down a bit to "read" the page
+        await humanScroll(page, 300);
+        await humanDelay(1000, 2000);
 
         // ── Step 1.5: Detect login wall ──────────────────────
         const currentUrl = page.url().toLowerCase();
@@ -308,9 +241,13 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
             };
         }
 
-        // ── Step 4: Add to cart ──────────────────────────────
+        // ── Step 4: Add to cart (with human-like behavior) ───
 
-        const addedToCart = await findAndClick(page, selectors.addToCart, 'add-to-cart');
+        // Scroll back up a bit to find the buy button
+        await humanScroll(page, -200);
+        await humanDelay(500, 1000);
+
+        const addedToCart = await humanFindAndClick(page, selectors.addToCart, 'add-to-cart');
 
         if (!addedToCart) {
             audit.record('ERROR_OCCURRED', {
@@ -329,20 +266,18 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         }
 
         audit.record('ADD_TO_CART_CLICKED', {}, await takeScreenshot(page));
-        await delay(2000);
+        await humanDelay(2000, 4000);
 
         // ── Step 5: Go to cart / checkout ────────────────────
 
-        // Try going directly to checkout first
-        let atCheckout = await findAndClick(page, selectors.goToCheckout, 'checkout');
+        let atCheckout = await humanFindAndClick(page, selectors.goToCheckout, 'checkout');
 
         if (!atCheckout) {
-            // Try going to cart first, then checkout
-            const wentToCart = await findAndClick(page, selectors.goToCart, 'go-to-cart');
+            const wentToCart = await humanFindAndClick(page, selectors.goToCart, 'go-to-cart');
             if (wentToCart) {
                 audit.record('CART_CONFIRMED', {}, await takeScreenshot(page));
-                await delay(2000);
-                atCheckout = await findAndClick(page, selectors.goToCheckout, 'checkout');
+                await humanDelay(2000, 3500);
+                atCheckout = await humanFindAndClick(page, selectors.goToCheckout, 'checkout');
             }
         }
 
@@ -352,6 +287,7 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
                 `https://www.${input.storeDomain}/checkout`,
                 `https://www.${input.storeDomain}/carrinho`,
                 `https://${input.storeDomain}/checkout`,
+                `https://sacola.${input.storeDomain}`,
             ];
 
             for (const url of checkoutUrls) {
@@ -366,13 +302,13 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         }
 
         audit.record('CHECKOUT_STARTED', { url: page.url() }, await takeScreenshot(page));
-        await delay(1500);
+        await humanDelay(1500, 3000);
 
-        // ── Step 6: Fill address ─────────────────────────────
+        // ── Step 6: Fill address (human-like typing) ─────────
 
         const addr = input.userData.endereco;
         const addressResults = {
-            cep: await fillField(page, selectors.addressFields.cep, addr.cep.replace(/\D/g, '')),
+            cep: await humanFillField(page, selectors.addressFields.cep, addr.cep.replace(/\D/g, '')),
             rua: false as boolean,
             numero: false as boolean,
             bairro: false as boolean,
@@ -382,18 +318,23 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
 
         // After filling CEP, wait for auto-fill
         if (addressResults.cep) {
-            await delay(3000);
+            await humanDelay(3000, 5000);
         }
 
-        // Fill remaining fields (some may auto-fill from CEP)
-        addressResults.rua = await fillField(page, selectors.addressFields.rua, addr.rua);
-        addressResults.numero = await fillField(page, selectors.addressFields.numero, addr.numero);
-        addressResults.bairro = await fillField(page, selectors.addressFields.bairro, addr.bairro);
-        addressResults.cidade = await fillField(page, selectors.addressFields.cidade, addr.cidade);
-        addressResults.estado = await fillField(page, selectors.addressFields.estado, addr.estado);
+        // Fill remaining fields with human-like typing
+        addressResults.rua = await humanFillField(page, selectors.addressFields.rua, addr.rua);
+        await humanDelay(300, 700);
+        addressResults.numero = await humanFillField(page, selectors.addressFields.numero, addr.numero);
+        await humanDelay(300, 700);
+        addressResults.bairro = await humanFillField(page, selectors.addressFields.bairro, addr.bairro);
+        await humanDelay(300, 700);
+        addressResults.cidade = await humanFillField(page, selectors.addressFields.cidade, addr.cidade);
+        await humanDelay(300, 700);
+        addressResults.estado = await humanFillField(page, selectors.addressFields.estado, addr.estado);
 
         if (addr.complemento) {
-            await fillField(page, selectors.addressFields.complemento, addr.complemento);
+            await humanDelay(300, 700);
+            await humanFillField(page, selectors.addressFields.complemento, addr.complemento);
         }
 
         audit.record('ADDRESS_FILLED', {
@@ -401,17 +342,15 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
             cep: addr.cep,
         }, await takeScreenshot(page));
 
-        await delay(1500);
+        await humanDelay(1500, 2500);
 
         // ── Step 7: Select shipping ──────────────────────────
 
-        // Try to select the first available shipping option
         let shippingSelected = false;
         for (const selector of selectors.shippingOptions) {
             try {
                 const options = await page.$$(selector);
                 if (options.length > 0) {
-                    // Click the first option (usually cheapest or default)
                     await options[0].click();
                     shippingSelected = true;
                     break;
@@ -422,19 +361,13 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         }
 
         audit.record('SHIPPING_SELECTED', { selected: shippingSelected }, await takeScreenshot(page));
-        await delay(1500);
+        await humanDelay(1500, 2500);
 
         // ── Step 8: Payment section ──────────────────────────
-        // NOTE: We use the Pagar.me token — never raw card data.
-        // The actual token integration depends on the store's
-        // payment gateway. For direct Pagar.me stores, we inject
-        // the token. For others, we log the limitation.
 
         const paymentFieldFound = await page.$(selectors.paymentSection[0]);
 
         if (paymentFieldFound) {
-            // Log that payment section was found but token injection
-            // requires store-specific integration
             audit.record('PAYMENT_FILLED', {
                 method: 'token',
                 tokenLastFour: input.paymentToken.lastFourDigits,
@@ -448,11 +381,11 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
             });
         }
 
-        await delay(1000);
+        await humanDelay(1000, 2000);
 
         // ── Step 9: Confirm order ────────────────────────────
 
-        const orderConfirmed = await findAndClick(page, selectors.confirmOrder, 'confirm');
+        const orderConfirmed = await humanFindAndClick(page, selectors.confirmOrder, 'confirm');
 
         if (!orderConfirmed) {
             audit.record('ERROR_OCCURRED', {
@@ -472,7 +405,7 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         audit.record('ORDER_CONFIRMED', {}, await takeScreenshot(page));
 
         // Wait for order confirmation page
-        await delay(5000);
+        await humanDelay(4000, 7000);
 
         // ── Step 10: Capture order details ───────────────────
 
@@ -483,9 +416,8 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         let orderNumber = await extractText(page, selectors.orderNumber);
 
         if (!orderNumber) {
-            // Regex fallback: "Pedido #12345", "Pedido nº 12345", "Order 12345"
             const orderMatch = confirmPageText.match(
-                /(?:pedido|order|nº|#)\s*[:.]?\s*([A-Z0-9-]{4,20})/i
+                /(?:pedido|order|nº|#)\s*[:.]\s*([A-Z0-9-]{4,20})/i
             );
             if (orderMatch) {
                 orderNumber = orderMatch[1];
@@ -531,7 +463,7 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
             valorTotal: totalValue,
             previsaoEntrega: deliveryEstimate,
             loja: input.storeName,
-            comprovanteUrl: undefined, // Set after saving screenshot
+            comprovanteUrl: undefined,
             timestamp: new Date(),
         };
 

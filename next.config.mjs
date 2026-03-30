@@ -2,7 +2,15 @@
 const nextConfig = {
     reactStrictMode: true,
     experimental: {
-        serverComponentsExternalPackages: ['playwright', 'ioredis', 'bullmq'],
+        serverComponentsExternalPackages: [
+            'playwright',
+            'playwright-extra',
+            'puppeteer-extra-plugin-stealth',
+            'puppeteer-extra',
+            'clone-deep',
+            'ioredis',
+            'bullmq',
+        ],
     },
     images: {
         remotePatterns: [

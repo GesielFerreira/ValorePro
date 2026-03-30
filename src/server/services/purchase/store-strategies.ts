@@ -114,22 +114,38 @@ const STORE_OVERRIDES: Record<string, Partial<StoreSelectors>> = {
 
     'magazineluiza.com.br': {
         addToCart: [
+            '#bagButton',
             'button[data-testid="bagButton"]',
-            'button:has-text("adicionar ao carrinho")',
+            'button:has-text("Adicionar à sacola")',
+            'button:has-text("Adicionar ao carrinho")',
+        ],
+        goToCheckout: [
+            '#buyButton',
+            'button[data-testid="buyButton"]',
+            'button:has-text("Comprar")',
+            'a[href*="/sacola"]',
         ],
         priceOnPage: [
-            '.product-price__highlight',
+            'p[data-testid="price-value"]',
             '[data-testid="price-value"]',
         ],
     },
 
     'magalu.com.br': {
         addToCart: [
+            '#bagButton',
             'button[data-testid="bagButton"]',
-            'button:has-text("adicionar ao carrinho")',
+            'button:has-text("Adicionar à sacola")',
+            'button:has-text("Adicionar ao carrinho")',
+        ],
+        goToCheckout: [
+            '#buyButton',
+            'button[data-testid="buyButton"]',
+            'button:has-text("Comprar")',
+            'a[href*="/sacola"]',
         ],
         priceOnPage: [
-            '.product-price__highlight',
+            'p[data-testid="price-value"]',
             '[data-testid="price-value"]',
         ],
     },
