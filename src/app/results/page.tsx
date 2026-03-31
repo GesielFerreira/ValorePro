@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Loader2, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles, AlertTriangle, RefreshCw, GitCompare, Lightbulb, X } from 'lucide-react';
 import { ProductCard } from '@/components/ProductCard';
 import { SearchSkeleton } from '@/components/Skeletons';
 import { PriceChart } from '@/components/PriceChart';
+import { ComparisonTable } from '@/components/ComparisonTable';
+import { TimingBadge } from '@/components/TimingBadge';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TRUSTED_ECOMMERCE_DOMAINS } from '@/types/search';
@@ -40,6 +42,46 @@ interface SearchResponse {
     userName?: string;
 }
 
+interface PriceAnalysisData {
+    timing: 'buy_now' | 'normal' | 'wait';
+    timingLabel: string;
+    trendPercent: number;
+    recommendation: string;
+}
+
+interface Recommendation {
+    query: string;
+    reason: string;
+    category: string;
+    icon: string;
+}
+
+// Known Pix discounts per store
+const PIX_DISCOUNTS: Record<string, number> = {
+    'kabum.com.br': 5,
+    'magazineluiza.com.br': 3,
+    'magalu.com.br': 3,
+    'americanas.com.br': 5,
+    'casasbahia.com.br': 5,
+    'pichau.com.br': 5,
+    'terabyteshop.com.br': 5,
+};
+
+const CASHBACK_RATES: Record<string, number> = {
+    'magazineluiza.com.br': 2,
+    'magalu.com.br': 2,
+    'shopee.com.br': 3,
+    'mercadolivre.com.br': 1,
+};
+
+const FREE_SHIPPING_MIN: Record<string, number> = {
+    'mercadolivre.com.br': 79,
+    'magazineluiza.com.br': 99,
+    'magalu.com.br': 99,
+    'americanas.com.br': 99,
+    'casasbahia.com.br': 99,
+};
+
 const LOADING_MESSAGES = [
     'Varrendo a web...',
     'Consultando Mercado Livre...',
@@ -47,6 +89,7 @@ const LOADING_MESSAGES = [
     'Verificando lojas confiáveis...',
     'Comparando preços...',
     'Calculando fretes...',
+    'Analisando tendências...',
     'Quase lá...',
 ];
 
@@ -69,25 +112,28 @@ function ResultsContent() {
     const [isNoPlan, setIsNoPlan] = useState(false);
     const [storeReputations, setStoreReputations] = useState<Record<string, any>>({});
 
+    // New feature states
+    const [priceAnalysis, setPriceAnalysis] = useState<PriceAnalysisData | null>(null);
+    const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+    const [showCompare, setShowCompare] = useState(false);
+    const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
 
     // Known trusted domains get a baseline score
     const getBaselineScore = (domain: string): number => {
         const clean = domain.replace(/^www\./, '');
         if (TRUSTED_ECOMMERCE_DOMAINS.some(t => clean.includes(t))) return 85;
-        return 50; // Unknown stores start at 50
+        return 50;
     };
 
     const fetchTrustScores = useCallback(async (items: SearchResultItem[]) => {
         const uniqueDomains = [...new Set(items.map((r) => r.store.domain))];
 
-        // Set baseline scores immediately
         const baseline: Record<string, any> = {};
         for (const domain of uniqueDomains) {
             baseline[domain] = { trust_score: getBaselineScore(domain) };
         }
         setStoreReputations(baseline);
 
-        // Fetch real scores in background (non-blocking, one at a time)
         for (const domain of uniqueDomains.slice(0, 10)) {
             try {
                 const item = items.find((r) => r.store.domain === domain);
@@ -103,16 +149,35 @@ function ResultsContent() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.trust_score != null) {
-                        setStoreReputations((prev) => ({
-                            ...prev,
-                            [domain]: data,
-                        }));
+                        setStoreReputations((prev) => ({ ...prev, [domain]: data }));
                     }
                 }
-            } catch {
-                // Keep baseline score on failure
-            }
+            } catch { /* Keep baseline */ }
         }
+    }, []);
+
+    // Fetch price timing analysis
+    const fetchPriceAnalysis = useCallback(async (bestPrice: number) => {
+        try {
+            const res = await fetch(`/api/price-analysis?term=${encodeURIComponent(query)}&price=${bestPrice}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.dataPoints > 0) {
+                    setPriceAnalysis(data);
+                }
+            }
+        } catch { /* silent */ }
+    }, [query]);
+
+    // Fetch AI recommendations
+    const fetchRecommendations = useCallback(async () => {
+        try {
+            const res = await fetch('/api/recommendations');
+            if (res.ok) {
+                const data = await res.json();
+                setRecommendations(data.recommendations || []);
+            }
+        } catch { /* silent */ }
     }, []);
 
     const fetchResults = useCallback(async (force = false) => {
@@ -128,6 +193,7 @@ function ResultsContent() {
         setNeedsLogin(false);
         setNeedsUpgrade(false);
         setIsNoPlan(false);
+        setPriceAnalysis(null);
 
         try {
             const res = await fetch('/api/search', {
@@ -162,18 +228,21 @@ function ResultsContent() {
             if (response.totalResults === 0) {
                 setError('Nenhum resultado encontrado. Tente um termo diferente.');
             } else {
-                // Fetch trust scores in background
                 fetchTrustScores(response.results);
-
-
+                // Fetch price analysis with best price
+                if (response.bestPrice) {
+                    fetchPriceAnalysis(response.bestPrice.cashPrice);
+                }
+                // Fetch recommendations
+                fetchRecommendations();
             }
-        } catch (err) {
+        } catch {
             setError('Erro de conexão. Verifique sua internet.');
         } finally {
             setLoading(false);
             isFetchingRef.current = false;
         }
-    }, [query, fetchTrustScores]);
+    }, [query, fetchTrustScores, fetchPriceAnalysis, fetchRecommendations]);
 
     // Loading messages rotation
     useEffect(() => {
@@ -191,6 +260,44 @@ function ResultsContent() {
         fetchResults();
     }, [fetchResults]);
 
+    // Compare helpers
+    const toggleCompare = (id: string) => {
+        setCompareIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else if (next.size < 4) {
+                next.add(id);
+            } else {
+                toast.error('Máximo 4 produtos para comparar.');
+            }
+            return next;
+        });
+    };
+
+    const getPixPrice = (price: number, domain: string): number | null => {
+        const cleanDomain = domain.replace(/^www\./, '');
+        const discount = PIX_DISCOUNTS[cleanDomain];
+        if (!discount) return null;
+        return Math.round((price * (1 - discount / 100)) * 100) / 100;
+    };
+
+    const compareItems = results
+        .filter(r => compareIds.has(r.id))
+        .map(r => ({
+            id: r.id,
+            title: r.title,
+            cashPrice: r.cashPrice,
+            totalPrice: r.totalPrice,
+            shippingCost: r.shippingCost,
+            shippingDays: r.shippingDays,
+            storeName: r.store.name,
+            storeDomain: r.store.domain,
+            imageUrl: r.imageUrl,
+            trustScore: storeReputations[r.store.domain]?.trust_score,
+            pixPrice: getPixPrice(r.cashPrice, r.store.domain) ?? undefined,
+        }));
+
     // ── Loading State ────────────────────────────────────────
     if (loading) {
         return (
@@ -198,7 +305,6 @@ function ResultsContent() {
                 <button onClick={() => router.back()} className="flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700 mb-4">
                     <ArrowLeft size={16} /> Voltar
                 </button>
-
                 <div className="text-center py-12">
                     <div className="relative inline-flex items-center justify-center w-16 h-16 mb-4">
                         <div className="absolute inset-0 rounded-full border-2 border-brand-200 animate-ping opacity-30" />
@@ -206,17 +312,11 @@ function ResultsContent() {
                             <Loader2 size={24} className="text-brand-500 animate-spin" />
                         </div>
                     </div>
-                    <motion.p
-                        key={loadingMsg}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-sm font-medium text-surface-600"
-                    >
+                    <motion.p key={loadingMsg} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-sm font-medium text-surface-600">
                         {loadingMsg}
                     </motion.p>
                     <p className="text-xs text-surface-400 mt-1">Buscando &quot;{query}&quot;</p>
                 </div>
-
                 <SearchSkeleton />
             </div>
         );
@@ -229,7 +329,6 @@ function ResultsContent() {
                 <button onClick={() => router.back()} className="flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700 mb-4">
                     <ArrowLeft size={16} /> Voltar
                 </button>
-
                 <div className="text-center py-16">
                     {needsUpgrade ? (
                         <>
@@ -313,7 +412,31 @@ function ResultsContent() {
                         {totalResults} resultados{savings > 0 && ` · Economia de até ${formatCurrency(savings)}`}
                     </p>
                 </div>
+                {/* Timing badge */}
+                {priceAnalysis && (
+                    <TimingBadge
+                        timing={priceAnalysis.timing}
+                        label={priceAnalysis.timingLabel}
+                        trendPercent={priceAnalysis.trendPercent}
+                        size="md"
+                        showTrend
+                    />
+                )}
             </div>
+
+            {/* Price Analysis recommendation */}
+            {priceAnalysis && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 bg-surface-50 border border-surface-200 rounded-2xl"
+                >
+                    <p className="text-xs text-surface-600 flex items-start gap-2">
+                        <Lightbulb size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                        <span>{priceAnalysis.recommendation}</span>
+                    </p>
+                </motion.div>
+            )}
 
             {/* Savings banner */}
             {savings > 0 && (
@@ -339,12 +462,23 @@ function ResultsContent() {
             {/* Price chart toggle */}
             <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-surface-700">Resultados</span>
-                <button
-                    onClick={() => setShowChart(!showChart)}
-                    className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1"
-                >
-                    {showChart ? 'Ocultar gráfico' : 'Ver histórico de preços'}
-                </button>
+                <div className="flex items-center gap-3">
+                    {compareIds.size > 0 && (
+                        <button
+                            onClick={() => setShowCompare(true)}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                            <GitCompare size={14} />
+                            Comparar ({compareIds.size})
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowChart(!showChart)}
+                        className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                    >
+                        {showChart ? 'Ocultar gráfico' : 'Ver histórico de preços'}
+                    </button>
+                </div>
             </div>
 
             <AnimatePresence>
@@ -362,39 +496,113 @@ function ResultsContent() {
 
             {/* Results list */}
             <div className="space-y-3">
-                {results.map((r, i) => (
-                    <ProductCard
-                        key={r.id}
-                        rank={i}
-                        title={r.title}
-                        cashPrice={r.cashPrice}
-                        totalPrice={r.totalPrice}
-                        shippingCost={r.shippingCost}
-                        shippingDays={r.shippingDays}
-                        storeName={r.store.name}
-                        storeDomain={r.store.domain}
-                        imageUrl={r.imageUrl}
-                        storeDetails={storeReputations[r.store.domain]}
-                        url={r.url}
-                        isBest={i === 0}
-                        onBuyClick={() => {
-                            const params = new URLSearchParams({
-                                resultId: r.id,
-                                title: r.title,
-                                price: String(r.cashPrice),
-                                totalPrice: String(r.totalPrice),
-                                shipping: String(r.shippingCost),
-                                shippingDays: String(r.shippingDays ?? ''),
-                                storeName: r.store.name,
-                                storeDomain: r.store.domain,
-                                productUrl: r.url,
-                                imageUrl: r.imageUrl || '',
-                            });
-                            router.push(`/confirm?${params.toString()}`);
-                        }}
-                    />
-                ))}
+                {results.map((r, i) => {
+                    const cleanDomain = r.store.domain.replace(/^www\./, '');
+                    const pixDiscount = PIX_DISCOUNTS[cleanDomain] ?? 0;
+                    const pixPrice = pixDiscount > 0
+                        ? Math.round((r.cashPrice * (1 - pixDiscount / 100)) * 100) / 100
+                        : null;
+
+                    return (
+                        <ProductCard
+                            key={r.id}
+                            rank={i}
+                            title={r.title}
+                            cashPrice={r.cashPrice}
+                            totalPrice={r.totalPrice}
+                            shippingCost={r.shippingCost}
+                            shippingDays={r.shippingDays}
+                            storeName={r.store.name}
+                            storeDomain={r.store.domain}
+                            imageUrl={r.imageUrl}
+                            storeDetails={storeReputations[r.store.domain]}
+                            url={r.url}
+                            isBest={i === 0}
+                            timing={priceAnalysis ? {
+                                timing: priceAnalysis.timing,
+                                label: priceAnalysis.timingLabel,
+                            } : null}
+                            pixPrice={pixPrice}
+                            pixDiscount={pixDiscount > 0 ? pixDiscount : undefined}
+                            cashbackPercent={CASHBACK_RATES[cleanDomain]}
+                            freeShippingMin={FREE_SHIPPING_MIN[cleanDomain]}
+                            resultId={r.id}
+                            isInCompare={compareIds.has(r.id)}
+                            onToggleCompare={() => toggleCompare(r.id)}
+                            onBuyClick={() => {
+                                // Checkout Assistant: deep link to store
+                                const params = new URLSearchParams({
+                                    title: r.title,
+                                    price: String(r.cashPrice),
+                                    totalPrice: String(r.totalPrice),
+                                    shipping: String(r.shippingCost),
+                                    shippingDays: String(r.shippingDays ?? ''),
+                                    storeName: r.store.name,
+                                    storeDomain: r.store.domain,
+                                    productUrl: r.url,
+                                    imageUrl: r.imageUrl || '',
+                                    pixPrice: pixPrice ? String(pixPrice) : '',
+                                    pixDiscount: pixDiscount ? String(pixDiscount) : '',
+                                });
+                                router.push(`/confirm?${params.toString()}`);
+                            }}
+                        />
+                    );
+                })}
             </div>
+
+            {/* AI Recommendations */}
+            {recommendations.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mt-6 pt-4 border-t border-surface-200"
+                >
+                    <h3 className="text-sm font-semibold text-surface-700 mb-3 flex items-center gap-2">
+                        <Sparkles size={16} className="text-brand-500" />
+                        Recomendações para Você
+                    </h3>
+                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                        {recommendations.map((rec, i) => (
+                            <button
+                                key={i}
+                                onClick={() => router.push(`/results?q=${encodeURIComponent(rec.query)}`)}
+                                className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-surface-50 hover:bg-surface-100 border border-surface-200 rounded-xl transition-all text-left"
+                            >
+                                <span className="text-base">{rec.icon}</span>
+                                <div>
+                                    <p className="text-xs font-medium text-surface-800">{rec.query}</p>
+                                    <p className="text-[10px] text-surface-500">{rec.reason}</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Comparison Table */}
+            <AnimatePresence>
+                {showCompare && compareItems.length > 0 && (
+                    <ComparisonTable
+                        items={compareItems}
+                        onRemove={(id) => toggleCompare(id)}
+                        onClose={() => setShowCompare(false)}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Floating compare button */}
+            {compareIds.size >= 2 && !showCompare && (
+                <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => setShowCompare(true)}
+                    className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-5 py-3 bg-blue-600 text-white text-sm font-bold rounded-full shadow-xl shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95"
+                >
+                    <GitCompare size={18} />
+                    Comparar {compareIds.size} produtos
+                </motion.button>
+            )}
         </div>
     );
 }

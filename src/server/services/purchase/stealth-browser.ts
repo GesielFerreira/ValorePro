@@ -27,23 +27,46 @@ function randomFloat(min: number, max: number): number {
     return Math.random() * (max - min) + min;
 }
 
-// ── Stealth Browser Launch ───────────────────────────────────
+// ── Stealth Browser Launch (with persistent session) ─────────
 
-export async function launchStealthBrowser(): Promise<Browser> {
+import path from 'path';
+import os from 'os';
+
+const USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+];
+
+// Persistent profile dir — cookies/logins survive between runs
+const PROFILE_DIR = path.join(os.homedir(), '.valorepro-browser');
+
+/**
+ * Launches a persistent stealth browser context.
+ * Cookies, localStorage, and login sessions are saved to disk
+ * and reused across purchase attempts.
+ *
+ * Returns { context, close } — call close() when done.
+ */
+export async function launchPersistentStealthContext(): Promise<{
+    context: BrowserContext;
+    close: () => Promise<void>;
+}> {
     let chromium: any;
+    let useStealth = false;
 
     try {
-        // Try playwright-extra with stealth plugin first
         const pwExtra = await import('playwright-extra');
         const stealthModule = await import('puppeteer-extra-plugin-stealth');
         const stealth = stealthModule.default();
 
         chromium = pwExtra.chromium;
         chromium.use(stealth);
+        useStealth = true;
 
         log.info('Stealth plugin loaded via playwright-extra');
     } catch (err) {
-        // Fallback to regular playwright
         log.warn('playwright-extra not available, falling back to standard playwright', {
             error: String(err),
         });
@@ -51,7 +74,158 @@ export async function launchStealthBrowser(): Promise<Browser> {
         chromium = pw.chromium;
     }
 
-    const browser = await chromium.launch({
+    const userAgent = USER_AGENTS[randomBetween(0, USER_AGENTS.length - 1)];
+
+    const context = await chromium.launchPersistentContext(PROFILE_DIR, {
+        headless: true,
+        channel: 'chrome',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-infobars',
+            '--window-size=1366,768',
+        ],
+        userAgent,
+        viewport: { width: 1366, height: 768 },
+        locale: 'pt-BR',
+        timezoneId: 'America/Sao_Paulo',
+        geolocation: { latitude: -23.5505, longitude: -46.6333 },
+        permissions: ['geolocation'],
+        colorScheme: 'light' as const,
+        deviceScaleFactor: 1,
+    });
+
+    // Inject anti-detection script
+    await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined,
+        });
+
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [
+                { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                { name: 'Native Client', filename: 'internal-nacl-plugin' },
+            ],
+        });
+
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['pt-BR', 'pt', 'en-US', 'en'],
+        });
+
+        const originalQuery = window.navigator.permissions.query;
+        // @ts-ignore
+        window.navigator.permissions.query = (parameters: any) =>
+            parameters.name === 'notifications'
+                ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
+                : originalQuery(parameters);
+
+        // @ts-ignore
+        window.chrome = {
+            runtime: {
+                onConnect: { addListener: () => {} },
+                onMessage: { addListener: () => {} },
+            },
+        };
+    });
+
+    log.info('Persistent stealth context launched', {
+        profileDir: PROFILE_DIR,
+        stealth: useStealth,
+        userAgent: userAgent.slice(0, 50) + '...',
+    });
+
+    return {
+        context,
+        close: async () => {
+            try {
+                await context.close();
+            } catch {
+                // already closed
+            }
+        },
+    };
+}
+
+/**
+ * Launches the persistent browser in **visible (headed) mode** so the user
+ * can log in to a store. Cookies are saved to the same profile used by
+ * the headless purchase agent.
+ *
+ * Returns a promise that resolves when the user closes the browser.
+ */
+export async function launchVisibleBrowserForLogin(storeUrl: string): Promise<void> {
+    let chromium: any;
+
+    try {
+        const pwExtra = await import('playwright-extra');
+        const stealthModule = await import('puppeteer-extra-plugin-stealth');
+        const stealth = stealthModule.default();
+        chromium = pwExtra.chromium;
+        chromium.use(stealth);
+    } catch {
+        const pw = await import('playwright');
+        chromium = pw.chromium;
+    }
+
+    const userAgent = USER_AGENTS[randomBetween(0, USER_AGENTS.length - 1)];
+
+    log.info('Launching visible browser for login', { storeUrl, profileDir: PROFILE_DIR });
+
+    const context = await chromium.launchPersistentContext(PROFILE_DIR, {
+        headless: false,        // ← VISIBLE to the user
+        channel: 'chrome',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-infobars',
+            '--start-maximized',
+        ],
+        userAgent,
+        viewport: null,         // Use full window size
+        locale: 'pt-BR',
+        timezoneId: 'America/Sao_Paulo',
+        colorScheme: 'light' as const,
+    });
+
+    // Navigate to store
+    const pages = context.pages();
+    const page = pages.length > 0 ? pages[0] : await context.newPage();
+    await page.goto(storeUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+    log.info('Visible browser opened for login, waiting for user to close...');
+
+    // Wait for the user to close the browser window
+    await new Promise<void>((resolve) => {
+        context.on('close', () => {
+            log.info('User closed the login browser');
+            resolve();
+        });
+    });
+}
+
+// ── Legacy exports (backward compat) ─────────────────────────
+// Keep for any code still using the old API
+
+export async function launchStealthBrowser(): Promise<Browser> {
+    let chromium: any;
+
+    try {
+        const pwExtra = await import('playwright-extra');
+        const stealthModule = await import('puppeteer-extra-plugin-stealth');
+        const stealth = stealthModule.default();
+
+        chromium = pwExtra.chromium;
+        chromium.use(stealth);
+    } catch {
+        const pw = await import('playwright');
+        chromium = pw.chromium;
+    }
+
+    return chromium.launch({
         headless: true,
         args: [
             '--no-sandbox',
@@ -62,23 +236,10 @@ export async function launchStealthBrowser(): Promise<Browser> {
             '--window-size=1366,768',
         ],
     });
-
-    log.info('Stealth browser launched');
-    return browser;
 }
-
-// ── Human-Like Context ───────────────────────────────────────
-
-const USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-];
 
 export async function createHumanContext(browser: Browser): Promise<BrowserContext> {
     const userAgent = USER_AGENTS[randomBetween(0, USER_AGENTS.length - 1)];
-
     const context = await browser.newContext({
         userAgent,
         viewport: { width: 1366, height: 768 },
@@ -90,14 +251,10 @@ export async function createHumanContext(browser: Browser): Promise<BrowserConte
         deviceScaleFactor: 1,
     });
 
-    // Remove automation traces
     await context.addInitScript(() => {
-        // Remove webdriver flag
         Object.defineProperty(navigator, 'webdriver', {
             get: () => undefined,
         });
-
-        // Override plugins to look real
         Object.defineProperty(navigator, 'plugins', {
             get: () => [
                 { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
@@ -105,21 +262,15 @@ export async function createHumanContext(browser: Browser): Promise<BrowserConte
                 { name: 'Native Client', filename: 'internal-nacl-plugin' },
             ],
         });
-
-        // Override languages
         Object.defineProperty(navigator, 'languages', {
             get: () => ['pt-BR', 'pt', 'en-US', 'en'],
         });
-
-        // Override permissions query
         const originalQuery = window.navigator.permissions.query;
         // @ts-ignore
         window.navigator.permissions.query = (parameters: any) =>
             parameters.name === 'notifications'
                 ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
                 : originalQuery(parameters);
-
-        // Chrome runtime mock
         // @ts-ignore
         window.chrome = {
             runtime: {
@@ -129,7 +280,6 @@ export async function createHumanContext(browser: Browser): Promise<BrowserConte
         };
     });
 
-    log.info('Human-like context created', { userAgent: userAgent.slice(0, 50) + '...' });
     return context;
 }
 

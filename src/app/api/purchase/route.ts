@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { resultId, addressId, cardId, confirmacao } = body;
+        const { resultId, addressId, cardId, confirmacao, acceptedPrice } = body;
 
         if (!resultId) {
             return NextResponse.json(
@@ -120,9 +120,14 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Cartão e endereço são obrigatórios para confirmar a compra.' }, { status: 400 });
             }
 
+            // Use acceptedPrice if user accepted a price change, otherwise use DB price
+            const finalExpectedPrice = acceptedPrice && typeof acceptedPrice === 'number' && acceptedPrice > 0
+                ? acceptedPrice
+                : result.cash_price;
+
             const purchaseInput: PurchaseInput = {
                 productUrl: result.product_url,
-                expectedPrice: result.cash_price,
+                expectedPrice: finalExpectedPrice,
                 storeDomain: result.store_domain,
                 storeName: result.store_name,
                 userData: {
@@ -177,7 +182,12 @@ export async function POST(request: NextRequest) {
                 });
 
                 return NextResponse.json(
-                    { error: purchaseResult.mensagem },
+                    {
+                        error: purchaseResult.mensagem,
+                        motivo: purchaseResult.motivo,
+                        urlManual: purchaseResult.urlManual,
+                        precoAtual: purchaseResult.precoAtual,
+                    },
                     { status: 400 },
                 );
             }

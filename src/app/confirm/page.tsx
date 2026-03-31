@@ -1,524 +1,391 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ShieldCheck, Truck, CreditCard, Lock, CheckCircle2, Fingerprint, X, Loader2, MapPin, AlertTriangle, ScanFace } from 'lucide-react';
-import { TrustBadge } from '@/components/TrustBadge';
-import { FaceAuth } from '@/components/FaceAuth';
-import { FaceRegister } from '@/components/FaceRegister';
-import { formatCurrency } from '@/lib/utils';
-import { toast } from 'sonner';
+import {
+    ExternalLink, ArrowLeft, Shield, Truck, Zap, Lightbulb,
+    Copy, CheckCircle2, ShoppingCart, Star, Loader2,
+    Bookmark, Share2,
+} from 'lucide-react';
 import Image from 'next/image';
+import { cn, formatCurrency } from '@/lib/utils';
+import { TrustBadge } from '@/components/TrustBadge';
+import { TimingBadge } from '@/components/TimingBadge';
+import { toast } from 'sonner';
+import { TRUSTED_ECOMMERCE_DOMAINS } from '@/types/search';
 
-interface ScoreDetail {
-    label: string;
-    value: string;
-    ok: boolean;
+function generateSmartLink(url: string, domain: string, title: string = ''): { url: string; type: string; hint: string } {
+    const clean = domain.replace(/^www\./, '');
+
+    // Amazon add-to-cart automation
+    if (clean === 'amazon.com.br' && !url.includes('google.com')) {
+        const asin = url.match(/\/dp\/([A-Z0-9]{10})/i)?.[1];
+        if (asin) {
+            return {
+                url: `https://www.amazon.com.br/gp/aws/cart/add.html?ASIN.1=${asin}&Quantity.1=1`,
+                type: 'Carrinho Direto',
+                hint: 'Produto será adicionado ao carrinho automaticamente.',
+            };
+        }
+    }
+
+    // Bypass Google Shopping "ibp=oshop" (In-browser product) aggregator UI
+    if (url.includes('google.com') && url.includes('ibp=')) {
+        const cleanTitle = encodeURIComponent(title.replace(/[^a-zA-Z0-9\s]/g, ''));
+        
+        if (clean === 'shopee.com.br' || clean.includes('shopee')) {
+            return {
+                url: `https://shopee.com.br/search?keyword=${cleanTitle}`,
+                type: 'Smart Search',
+                hint: 'Redirecionamento inteligente: Buscando o produto exato na vitrine da loja.',
+            };
+        }
+        if (clean === 'mercadolivre.com.br') {
+            const mlSearchParam = title.replace(/\s+/g, '-').toLowerCase();
+            return {
+                url: `https://lista.mercadolivre.com.br/${mlSearchParam}#D[A:${cleanTitle}]`,
+                type: 'Smart Search',
+                hint: 'Redirecionamento inteligente: Buscando o produto exato na vitrine da loja.',
+            };
+        }
+        if (clean === 'magazineluiza.com.br' || clean === 'magalu.com.br') {
+            return {
+                url: `https://www.magazineluiza.com.br/busca/${cleanTitle}/`,
+                type: 'Smart Search',
+                hint: 'Redirecionamento inteligente: Buscando o produto exato na vitrine da loja.',
+            };
+        }
+        if (clean === 'amazon.com.br') {
+            return {
+                url: `https://www.amazon.com.br/s?k=${cleanTitle}`,
+                type: 'Smart Search',
+                hint: 'Redirecionamento inteligente: Buscando o produto exato na vitrine da loja.',
+            };
+        }
+        
+        // Fallback default domain search
+        return {
+            url: `https://${clean}`,
+            type: 'Ir para a Loja',
+            hint: 'Acesso direto ao portal principal (Link oficial bloqueado pelo agregador).',
+        }
+    }
+
+    return {
+        url,
+        type: 'Página do Produto',
+        hint: 'Clique no botão de compra na loja.',
+    };
 }
 
-interface UserCard {
-    id: string;
-    last_four: string;
-    brand: string;
-    holder_name: string;
-    is_default: boolean;
-}
-
-interface UserAddress {
-    id: string;
-    label: string;
-    street: string;
-    number: string;
-    city: string;
-    state: string;
-    cep: string;
-    is_default: boolean;
-}
+// Store checkout tips
+const STORE_TIPS: Record<string, string[]> = {
+    'amazon.com.br': [
+        '🎯 Use Amazon Prime para frete grátis e entrega rápida',
+        '💳 Verifique cupons na página do produto',
+        '📦 Subscribe & Save dá até 15% off em recorrentes',
+    ],
+    'kabum.com.br': [
+        '⚡ Pix com desconto de até 5%',
+        '🚀 KaBuM! Prime: frete grátis',
+        '🔥 Flash Sales às sextas',
+    ],
+    'mercadolivre.com.br': [
+        '📦 Mercado Livre Full: frete grátis acima de R$ 79',
+        '🪙 Mercado Pontos: cashback',
+        '⭐ Verifique reputação do vendedor',
+    ],
+    'magazineluiza.com.br': [
+        '⚡ Pix dá ~3% de desconto',
+        '📱 App Magalu pode ter preço exclusivo',
+        '💰 Cashback para membros',
+    ],
+    'magalu.com.br': [
+        '⚡ Pix dá ~3% de desconto',
+        '📱 App Magalu pode ter preço exclusivo',
+        '💰 Cashback para membros',
+    ],
+    'americanas.com.br': [
+        '⚡ Pix dá até 5% de desconto',
+        '🎁 Cupom de primeira compra disponível',
+        '📦 Frete grátis acima de R$ 99',
+    ],
+    'shopee.com.br': [
+        '🎫 Use cupons do vendedor na página',
+        '🪙 Shopee Coins: cashback de até 5%',
+        '📦 Cupom de frete grátis',
+    ],
+};
 
 function ConfirmContent() {
-    const router = useRouter();
     const searchParams = useSearchParams();
+    const router = useRouter();
 
-    // Product data from URL params
-    const resultId = searchParams.get('resultId') || '';
-    const title = searchParams.get('title') || 'Produto';
+    const title = searchParams.get('title') || '';
     const price = Number(searchParams.get('price')) || 0;
     const totalPrice = Number(searchParams.get('totalPrice')) || 0;
     const shipping = Number(searchParams.get('shipping')) || 0;
-    const shippingDays = Number(searchParams.get('shippingDays')) || null;
-    const storeName = searchParams.get('storeName') || 'Loja';
+    const shippingDays = searchParams.get('shippingDays');
+    const storeName = searchParams.get('storeName') || '';
     const storeDomain = searchParams.get('storeDomain') || '';
     const productUrl = searchParams.get('productUrl') || '';
     const imageUrl = searchParams.get('imageUrl') || '';
+    const pixPriceParam = searchParams.get('pixPrice');
+    const pixDiscountParam = searchParams.get('pixDiscount');
 
-    // State
-    const [confirming, setConfirming] = useState(false);
-    const [confirmed, setConfirmed] = useState(false);
-    const [purchaseResult, setPurchaseResult] = useState<any>(null);
-    const [purchaseError, setPurchaseError] = useState<string | null>(null);
+    const pixPrice = pixPriceParam ? Number(pixPriceParam) : null;
+    const pixDiscount = pixDiscountParam ? Number(pixDiscountParam) : null;
 
-    // Face ID state
-    const [faceDescriptor, setFaceDescriptor] = useState<number[] | null>(null);
-    const [hasFace, setHasFace] = useState(false);
-    const [loadingFace, setLoadingFace] = useState(true);
-    const [showFaceAuth, setShowFaceAuth] = useState(false);
-    const [showFaceRegister, setShowFaceRegister] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [redirecting, setRedirecting] = useState(false);
+    const [savedToWatchlist, setSavedToWatchlist] = useState(false);
 
-    // Reputation data
-    const [trustScore, setTrustScore] = useState<number>(0);
-    const [scoreDetails, setScoreDetails] = useState<ScoreDetail[]>([]);
-    const [loadingReputation, setLoadingReputation] = useState(true);
+    const cleanDomain = storeDomain.replace(/^www\./, '');
+    const isTrusted = TRUSTED_ECOMMERCE_DOMAINS.some(d => cleanDomain.includes(d));
+    const smartLink = generateSmartLink(productUrl, storeDomain, title);
+    const tips = STORE_TIPS[cleanDomain] || [
+        '💡 Verifique se aceita Pix com desconto',
+        '🎫 Procure cupons de primeira compra',
+        '📦 Compare opções de frete',
+    ];
 
-    // User payment/address data
-    const [card, setCard] = useState<UserCard | null>(null);
-    const [address, setAddress] = useState<UserAddress | null>(null);
-    const [loadingUser, setLoadingUser] = useState(true);
-
-    const total = totalPrice || (price + shipping);
-
-    // Redirect if no product data
-    useEffect(() => {
-        if (!resultId && !searchParams.get('title')) {
-            router.replace('/');
-        }
-    }, [resultId, searchParams, router]);
-
-    // Fetch reputation data
-    useEffect(() => {
-        if (!storeDomain) return;
-
-        async function fetchReputation() {
-            try {
-                const res = await fetch('/api/reputation', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        domain: storeDomain,
-                        storeName,
-                        productPrice: price,
-                    }),
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    const score = data.trust_score ?? 0;
-                    setTrustScore(score);
-
-                    // Build score details from flat DB fields returned by the API
-                    const details: ScoreDetail[] = [
-                        {
-                            label: 'CNPJ ativo',
-                            value: '+25',
-                            ok: data.cnpj_status === 'ATIVA',
-                        },
-                        {
-                            label: 'Domínio > 2 anos',
-                            value: '+20',
-                            ok: (data.domain_age_years ?? 0) >= 2,
-                        },
-                        {
-                            label: 'SSL válido',
-                            value: '+15',
-                            ok: data.ssl_valid === true,
-                        },
-                        {
-                            label: 'Reclame Aqui ≥ 7',
-                            value: '+25',
-                            ok: (data.reclame_aqui_score ?? 0) >= 7,
-                        },
-                        {
-                            label: 'Google ≥ 4★',
-                            value: '+15',
-                            ok: (data.google_rating ?? 0) >= 4,
-                        },
-                    ];
-
-                    setScoreDetails(details);
-                }
-            } catch {
-                // Fallback: show unknown
-                setScoreDetails([
-                    { label: 'Verificação de loja', value: '—', ok: false },
-                ]);
-            } finally {
-                setLoadingReputation(false);
-            }
-        }
-
-        fetchReputation();
-    }, [storeDomain, storeName, price]);
-
-    // Fetch user card and address
-    useEffect(() => {
-        async function fetchUserData() {
-            try {
-                const res = await fetch('/api/user');
-                if (res.ok) {
-                    const data = await res.json();
-                    const cards: UserCard[] = data.cards || [];
-                    const addresses: UserAddress[] = data.addresses || [];
-                    setCard(cards.find((c: UserCard) => c.is_default) || cards[0] || null);
-                    setAddress(addresses.find((a: UserAddress) => a.is_default) || addresses[0] || null);
-                }
-            } catch { /* ignore */ } finally {
-                setLoadingUser(false);
-            }
-        }
-
-        fetchUserData();
-    }, []);
-
-    // Fetch face descriptor
-    useEffect(() => {
-        async function fetchFace() {
-            try {
-                const res = await fetch('/api/face');
-                if (res.ok) {
-                    const data = await res.json();
-                    setHasFace(data.hasDescriptor);
-                    setFaceDescriptor(data.descriptor);
-                }
-            } catch { /* ignore */ } finally {
-                setLoadingFace(false);
-            }
-        }
-
-        fetchFace();
-    }, []);
-
-    // Trigger Face ID verification
-    const handleFaceAuth = useCallback(() => {
-        if (!card) {
-            toast.error('Adicione um cartão em Configurações antes de comprar.');
-            return;
-        }
-        if (!hasFace || !faceDescriptor) {
-            setShowFaceRegister(true);
-            return;
-        }
-        setShowFaceAuth(true);
-    }, [card, hasFace, faceDescriptor]);
-
-    // Handle face auth success — proceed to purchase
-    const handleFaceSuccess = () => {
-        setShowFaceAuth(false);
-        handleConfirm();
+    const handleGoToStore = () => {
+        setRedirecting(true);
+        window.open(smartLink.url, '_blank');
+        setTimeout(() => setRedirecting(false), 2000);
     };
 
-    async function handleConfirm() {
-        if (!resultId) {
-            toast.error('Dados do produto não encontrados.');
-            return;
-        }
-        if (!card) {
-            toast.error('Adicione um cartão em Configurações antes de comprar.');
-            return;
-        }
+    const handleCopyLink = async () => {
+        await navigator.clipboard.writeText(smartLink.url);
+        setCopied(true);
+        toast.success('Link copiado!');
+        setTimeout(() => setCopied(false), 2000);
+    };
 
-        setConfirming(true);
-        setPurchaseError(null);
+    const handleShare = async () => {
+        const shareText = `🔥 ${title}\n💰 ${formatCurrency(price)} na ${storeName}\n🔗 ${productUrl}\n\nEncontrado pelo ValorePro`;
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: `${title} - ${formatCurrency(price)}`, text: shareText, url: productUrl });
+            } catch { /* cancelled */ }
+        } else {
+            await navigator.clipboard.writeText(shareText);
+            toast.success('Link copiado! 📋');
+        }
+    };
 
+    const handleWatchlist = async () => {
         try {
-            const res = await fetch('/api/purchase', {
+            const res = await fetch('/api/watchlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    resultId,
-                    cardId: card?.id,
-                    addressId: address?.id,
-                    confirmacao: true,
+                    productTitle: title,
+                    productUrl,
+                    imageUrl,
+                    storeName,
+                    storeDomain,
+                    price,
+                    shippingCost: shipping,
                 }),
             });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                setPurchaseError(data.error || 'Erro ao processar compra.');
-                toast.error(data.error || 'Erro ao processar compra.');
-                setConfirming(false);
-                return;
+            if (res.status === 409) {
+                toast.info('Já está na watchlist!');
+            } else if (res.ok) {
+                setSavedToWatchlist(true);
+                toast.success('Salvo na Watchlist! 📌');
+            } else {
+                toast.error('Erro ao salvar.');
             }
-
-            setPurchaseResult(data);
-            setConfirmed(true);
-            toast.success('Compra confirmada!');
         } catch {
-            setPurchaseError('Erro de conexão. Tente novamente.');
             toast.error('Erro de conexão.');
-        } finally {
-            setConfirming(false);
         }
-    }
-
-    if (confirmed && purchaseResult) {
-        return (
-            <div className="max-w-lg mx-auto px-4 pt-12 text-center">
-                <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200 }}
-                    className="w-20 h-20 mx-auto rounded-full bg-brand-100 flex items-center justify-center mb-6"
-                >
-                    <CheckCircle2 size={40} className="text-brand-600" />
-                </motion.div>
-                <h1 className="text-2xl font-bold text-surface-900 mb-2">Compra Confirmada!</h1>
-                <p className="text-surface-500 text-sm mb-6">
-                    Seu pedido foi registrado com sucesso na {storeName}.
-                </p>
-                <div className="bg-white rounded-2xl border border-surface-200 p-4 mb-6 text-left">
-                    <div className="flex justify-between text-sm mb-2">
-                        <span className="text-surface-500">Pedido</span>
-                        <span className="font-mono font-semibold text-surface-800">
-                            #{purchaseResult.purchase?.id?.slice(0, 8)?.toUpperCase() || 'VP'}
-                        </span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-2">
-                        <span className="text-surface-500">Total</span>
-                        <span className="font-semibold text-brand-600">{formatCurrency(total)}</span>
-                    </div>
-                    {shippingDays && (
-                        <div className="flex justify-between text-sm">
-                            <span className="text-surface-500">Entrega</span>
-                            <span className="text-surface-700">{shippingDays} dias úteis</span>
-                        </div>
-                    )}
-                </div>
-                <button
-                    onClick={() => router.push('/dashboard/purchases')}
-                    className="px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-xl transition-all w-full"
-                >
-                    Ver Minhas Compras
-                </button>
-            </div>
-        );
-    }
+    };
 
     return (
-        <div className="max-w-lg mx-auto px-4 pt-4 pb-8">
+        <div className="max-w-lg mx-auto px-4 pt-4 pb-12">
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
-                <button onClick={() => router.back()} className="p-2 -ml-2 rounded-xl hover:bg-surface-100 text-surface-500">
+                <button
+                    onClick={() => router.back()}
+                    className="p-2 -ml-2 rounded-xl hover:bg-surface-100 text-surface-500"
+                >
                     <ArrowLeft size={20} />
                 </button>
-                <h1 className="text-lg font-bold text-surface-900">Confirmar Compra</h1>
+                <div>
+                    <h1 className="text-lg font-bold text-surface-900">Assistente de Compra</h1>
+                    <p className="text-xs text-surface-500">Tudo pronto para você finalizar</p>
+                </div>
             </div>
 
-            {/* Product summary */}
+            {/* Product Card */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-2xl border border-surface-200 p-4 mb-4"
+                className="bg-white rounded-2xl border border-surface-200 p-4 mb-4 shadow-sm"
             >
                 <div className="flex gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-surface-100 flex-shrink-0 flex items-center justify-center overflow-hidden relative">
+                    <div className="w-20 h-20 rounded-xl bg-surface-100 overflow-hidden relative flex-shrink-0">
                         {imageUrl ? (
-                            <Image src={imageUrl} alt="" fill className="object-contain" unoptimized sizes="64px" />
+                            <Image src={imageUrl} alt={title} fill className="object-contain p-1" unoptimized sizes="80px" />
                         ) : (
-                            <span className="text-xs text-surface-300">📦</span>
+                            <div className="flex items-center justify-center h-full text-2xl">📦</div>
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h2 className="text-sm font-semibold text-surface-800 line-clamp-2">{title}</h2>
-                        <p className="text-xs text-surface-500 mt-0.5">{storeName}</p>
+                        <h2 className="text-sm font-medium text-surface-800 line-clamp-2 leading-snug">{title}</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-surface-500">{storeName}</span>
+                            {isTrusted && <TrustBadge score={85} size="sm" showLabel={false} />}
+                        </div>
                     </div>
                 </div>
 
-                <div className="mt-4 space-y-2 pt-3 border-t border-surface-100">
-                    <div className="flex justify-between text-sm">
-                        <span className="text-surface-500">Produto</span>
-                        <span className="text-surface-800">{formatCurrency(price)}</span>
+                {/* Price breakdown */}
+                <div className="mt-4 space-y-2 bg-surface-50 rounded-xl p-3 border border-surface-100">
+                    <div className="flex justify-between text-xs text-surface-600">
+                        <span>Preço à vista</span>
+                        <span className="font-semibold text-surface-800">{formatCurrency(price)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-surface-500 flex items-center gap-1"><Truck size={14} /> Frete</span>
-                        <span className={shipping === 0 ? 'text-brand-600 font-medium' : 'text-surface-800'}>
+                    {pixPrice && pixDiscount && (
+                        <div className="flex justify-between text-xs">
+                            <span className="text-teal-700 flex items-center gap-1">
+                                <Zap size={12} /> Preço no Pix (-{pixDiscount}%)
+                            </span>
+                            <span className="font-bold text-teal-700">{formatCurrency(pixPrice)}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between text-xs text-surface-600">
+                        <span className="flex items-center gap-1">
+                            <Truck size={12} /> Frete
+                        </span>
+                        <span className={cn(
+                            'font-semibold',
+                            shipping === 0 ? 'text-brand-600' : 'text-surface-800',
+                        )}>
                             {shipping === 0 ? 'Grátis' : formatCurrency(shipping)}
                         </span>
                     </div>
-                    <div className="flex justify-between text-sm font-bold pt-2 border-t border-surface-100">
-                        <span className="text-surface-900">Total</span>
-                        <span className="text-brand-600 text-lg">{formatCurrency(total)}</span>
-                    </div>
                     {shippingDays && (
-                        <p className="text-xs text-surface-500 text-right">
-                            Entrega em {shippingDays} dias úteis
-                        </p>
+                        <div className="flex justify-between text-xs text-surface-500">
+                            <span>Prazo estimado</span>
+                            <span>{shippingDays} dias úteis</span>
+                        </div>
                     )}
+                    <div className="border-t border-surface-200 pt-2 flex justify-between text-sm">
+                        <span className="font-semibold text-surface-800">Total</span>
+                        <span className="font-bold text-brand-600">{formatCurrency(totalPrice)}</span>
+                    </div>
                 </div>
             </motion.div>
 
-            {/* Trust score detail */}
+            {/* Smart redirect info */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-white rounded-2xl border border-surface-200 p-4 mb-4"
+                className="bg-brand-50 border border-brand-100 rounded-2xl p-4 mb-4"
             >
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-surface-800">Score de Confiança</h3>
-                    {loadingReputation ? (
-                        <Loader2 size={16} className="animate-spin text-surface-400" />
-                    ) : (
-                        <TrustBadge score={trustScore} size="md" />
-                    )}
+                <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+                        <ShoppingCart size={20} className="text-brand-600" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold text-brand-800">
+                            {smartLink.type === 'Carrinho Direto' ? '🎯 Link direto ao carrinho!' : '📦 Link para o produto'}
+                        </p>
+                        <p className="text-xs text-brand-600 mt-0.5">{smartLink.hint}</p>
+                    </div>
                 </div>
-
-                {loadingReputation ? (
-                    <div className="space-y-2">
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="h-5 bg-surface-100 rounded animate-pulse" />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        {scoreDetails.map((item) => (
-                            <div key={item.label} className="flex items-center justify-between text-sm">
-                                <div className="flex items-center gap-2">
-                                    {item.ok ? (
-                                        <CheckCircle2 size={14} className="text-emerald-500" />
-                                    ) : (
-                                        <X size={14} className="text-surface-400" />
-                                    )}
-                                    <span className={item.ok ? 'text-surface-700' : 'text-surface-400'}>{item.label}</span>
-                                </div>
-                                <span className={item.ok ? 'text-emerald-600 font-medium' : 'text-surface-300'}>{item.value}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </motion.div>
 
-            {/* Address */}
+            {/* Go to store button */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className="bg-white rounded-2xl border border-surface-200 p-4 mb-4"
+                className="space-y-3 mb-6"
             >
-                <div className="flex items-center gap-2 mb-2">
-                    <MapPin size={16} className="text-surface-600" />
-                    <h3 className="text-sm font-semibold text-surface-800">Endereço de Entrega</h3>
-                </div>
-                {loadingUser ? (
-                    <div className="h-10 bg-surface-100 rounded animate-pulse" />
-                ) : address ? (
-                    <div className="p-3 bg-surface-50 rounded-xl">
-                        <p className="text-sm text-surface-700">
-                            {address.street}, {address.number} — {address.city}, {address.state}
-                        </p>
-                        <p className="text-xs text-surface-500 font-mono">CEP: {address.cep}</p>
-                    </div>
-                ) : (
+                <button
+                    onClick={handleGoToStore}
+                    disabled={redirecting}
+                    className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-brand-500 hover:bg-brand-600 text-white text-base font-bold rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-brand-500/20 disabled:opacity-70"
+                >
+                    {redirecting ? (
+                        <>
+                            <Loader2 size={20} className="animate-spin" />
+                            Abrindo loja...
+                        </>
+                    ) : (
+                        <>
+                            <ExternalLink size={20} />
+                            Ir para {storeName}
+                        </>
+                    )}
+                </button>
+
+                <div className="flex gap-2">
                     <button
-                        onClick={() => router.push('/dashboard/settings')}
-                        className="w-full p-3 border-2 border-dashed border-surface-300 rounded-xl text-sm text-surface-500 hover:border-brand-400 hover:text-brand-600 transition-all"
+                        onClick={handleCopyLink}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-surface-200 rounded-xl text-sm font-medium text-surface-700 hover:bg-surface-50 transition-all"
                     >
-                        + Adicionar endereço
+                        {copied ? <CheckCircle2 size={16} className="text-brand-500" /> : <Copy size={16} />}
+                        {copied ? 'Copiado!' : 'Copiar link'}
                     </button>
-                )}
+                    <button
+                        onClick={handleWatchlist}
+                        disabled={savedToWatchlist}
+                        className={cn(
+                            'flex-1 flex items-center justify-center gap-2 py-3 border rounded-xl text-sm font-medium transition-all',
+                            savedToWatchlist
+                                ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                : 'bg-white border-surface-200 text-surface-700 hover:bg-surface-50',
+                        )}
+                    >
+                        <Bookmark size={16} />
+                        {savedToWatchlist ? 'Na Watchlist!' : 'Watchlist'}
+                    </button>
+                    <button
+                        onClick={handleShare}
+                        className="flex items-center justify-center w-12 py-3 bg-white border border-surface-200 rounded-xl text-surface-700 hover:bg-surface-50 transition-all"
+                    >
+                        <Share2 size={16} />
+                    </button>
+                </div>
             </motion.div>
 
-            {/* Payment */}
+            {/* Store tips */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-white rounded-2xl border border-surface-200 p-4 mb-6"
+                className="bg-white rounded-2xl border border-surface-200 p-4"
             >
-                <div className="flex items-center gap-2 mb-2">
-                    <CreditCard size={16} className="text-surface-600" />
-                    <h3 className="text-sm font-semibold text-surface-800">Pagamento</h3>
+                <h3 className="text-sm font-semibold text-surface-800 flex items-center gap-2 mb-3">
+                    <Lightbulb size={16} className="text-amber-500" />
+                    Dicas para economizar na {storeName}
+                </h3>
+                <div className="space-y-2">
+                    {tips.map((tip, i) => (
+                        <p key={i} className="text-xs text-surface-600 leading-relaxed">{tip}</p>
+                    ))}
                 </div>
-                {loadingUser ? (
-                    <div className="h-10 bg-surface-100 rounded animate-pulse" />
-                ) : card ? (
-                    <div className="flex items-center gap-3 p-3 bg-surface-50 rounded-xl">
-                        <div className="w-10 h-7 bg-blue-600 rounded flex items-center justify-center">
-                            <span className="text-white text-[10px] font-bold">{card.brand?.toUpperCase()?.slice(0, 4)}</span>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-surface-800">•••• •••• •••• {card.last_four}</p>
-                            <p className="text-xs text-surface-500">Cartão tokenizado · PCI-DSS</p>
-                        </div>
-                        <Lock size={14} className="ml-auto text-emerald-500" />
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => router.push('/dashboard/settings')}
-                        className="w-full p-3 border-2 border-dashed border-surface-300 rounded-xl text-sm text-surface-500 hover:border-brand-400 hover:text-brand-600 transition-all"
-                    >
-                        + Adicionar cartão
-                    </button>
-                )}
             </motion.div>
 
-            {/* Error message */}
-            {purchaseError && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center gap-2 p-3 mb-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"
-                >
-                    <AlertTriangle size={16} />
-                    {purchaseError}
-                </motion.div>
-            )}
-
-            {/* Face ID modals */}
-            {showFaceAuth && faceDescriptor && (
-                <FaceAuth
-                    storedDescriptor={faceDescriptor}
-                    onSuccess={handleFaceSuccess}
-                    onFail={() => {
-                        setShowFaceAuth(false);
-                        toast.error('Reconhecimento facial falhou. Tente novamente.');
-                    }}
-                    onCancel={() => setShowFaceAuth(false)}
-                />
-            )}
-
-            {showFaceRegister && (
-                <FaceRegister
-                    onComplete={async () => {
-                        setShowFaceRegister(false);
-                        // Reload face descriptor
-                        const res = await fetch('/api/face');
-                        if (res.ok) {
-                            const data = await res.json();
-                            setHasFace(data.hasDescriptor);
-                            setFaceDescriptor(data.descriptor);
-                        }
-                        toast.success('Face ID cadastrado! Agora confirme a compra.');
-                    }}
-                    onCancel={() => setShowFaceRegister(false)}
-                />
-            )}
-
-            {/* Confirm button — Face ID disabled temporarily, call handleConfirm directly */}
-            <motion.button
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
+            {/* Security badge */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                onClick={handleConfirm}
-                disabled={confirming || !card || loadingUser}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-400 disabled:cursor-not-allowed text-white text-base font-bold rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-brand-500/30"
+                className="mt-4 flex items-center justify-center gap-2 py-3"
             >
-                {confirming ? (
-                    <>
-                        <Fingerprint size={20} className="animate-pulse" />
-                        Processando compra...
-                    </>
-                ) : (
-                    <>
-                        <ShieldCheck size={20} />
-                        Confirmar Compra · {formatCurrency(total)}
-                    </>
-                )}
-            </motion.button>
-
-            <p className="text-center text-[11px] text-surface-400 mt-3 flex items-center justify-center gap-1">
-                <Lock size={10} /> Compra protegida por tokenização PCI-DSS
-            </p>
+                <Shield size={14} className="text-surface-400" />
+                <p className="text-[11px] text-surface-400">
+                    Você será redirecionado com segurança para a loja oficial.
+                    ValorePro não armazena dados de pagamento.
+                </p>
+            </motion.div>
         </div>
     );
 }
@@ -526,8 +393,8 @@ function ConfirmContent() {
 export default function ConfirmPage() {
     return (
         <Suspense fallback={
-            <div className="max-w-lg mx-auto px-4 pt-12 flex items-center justify-center">
-                <Loader2 size={24} className="animate-spin text-brand-500" />
+            <div className="max-w-lg mx-auto px-4 pt-12 flex justify-center">
+                <Loader2 size={32} className="text-brand-500 animate-spin" />
             </div>
         }>
             <ConfirmContent />

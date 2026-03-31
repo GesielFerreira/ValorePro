@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingDown, ShoppingBag, Bell, ChevronRight, Wallet, Loader2, LogIn, Search, Clock, Smartphone } from 'lucide-react';
+import { TrendingDown, ShoppingBag, Bell, ChevronRight, Wallet, Loader2, LogIn, Search, Clock, Smartphone, Bookmark, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -132,6 +132,42 @@ export default function DashboardPage() {
                         <p className="text-xs text-surface-500">{stat.label}</p>
                     </motion.div>
                 ))}
+            </div>
+
+            {/* Quick actions */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35 }}
+                >
+                    <Link
+                        href="/dashboard/watchlist"
+                        className="block bg-white rounded-2xl border border-surface-200 p-4 hover:border-brand-200 hover:shadow-md transition-all group"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3 group-hover:bg-amber-100 transition-colors">
+                            <Bookmark size={18} className="text-amber-600" />
+                        </div>
+                        <p className="text-sm font-semibold text-surface-800">Watchlist</p>
+                        <p className="text-xs text-surface-500">Monitore preços</p>
+                    </Link>
+                </motion.div>
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                >
+                    <Link
+                        href="/dashboard/alerts"
+                        className="block bg-white rounded-2xl border border-surface-200 p-4 hover:border-brand-200 hover:shadow-md transition-all group"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center mb-3 group-hover:bg-brand-100 transition-colors">
+                            <Bell size={18} className="text-brand-600" />
+                        </div>
+                        <p className="text-sm font-semibold text-surface-800">Alertas de Preço</p>
+                        <p className="text-xs text-surface-500">{data.stats.activeAlerts} ativos</p>
+                    </Link>
+                </motion.div>
             </div>
 
             {/* Savings banner */}

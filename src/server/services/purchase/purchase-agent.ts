@@ -12,15 +12,14 @@ import { createLogger } from '@/lib/logger';
 import { PurchaseAuditLog } from './audit-logger';
 import { getSelectorsForStore } from './store-strategies';
 import {
-    launchStealthBrowser,
-    createHumanContext,
+    launchPersistentStealthContext,
     humanDelay,
     humanFindAndClick,
     humanFillField,
     humanScroll,
     dismissPopups,
 } from './stealth-browser';
-import type { Page, Browser } from 'playwright';
+import type { Page, BrowserContext } from 'playwright';
 import type {
     PurchaseInput,
     PurchaseResult,
@@ -38,7 +37,28 @@ const PRICE_TOLERANCE = 0.05;
 
 function parseBrazilianPrice(text: string): number | null {
     if (!text) return null;
-    const cleaned = text.replace(/R\$\s*/g, '').replace(/[^\d.,]/g, '').trim();
+
+    // Remove currency symbol and whitespace
+    let cleaned = text.replace(/R\$\s*/g, '').trim();
+    if (!cleaned) return null;
+
+    // Try to extract a standard Brazilian price pattern first: "1.234,56" or "1234,56"
+    const brPriceMatch = cleaned.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/);
+    if (brPriceMatch) {
+        const normalized = brPriceMatch[1].replace(/\./g, '').replace(',', '.');
+        const value = parseFloat(normalized);
+        if (!isNaN(value) && value > 0 && value < 100_000) return value;
+    }
+
+    // Try plain decimal format: "1234.56"
+    const plainMatch = cleaned.match(/(\d+\.\d{2})(?!\d)/);
+    if (plainMatch) {
+        const value = parseFloat(plainMatch[1]);
+        if (!isNaN(value) && value > 0 && value < 100_000) return value;
+    }
+
+    // Fallback: remove non-numeric except , and .
+    cleaned = cleaned.replace(/[^\d.,]/g, '');
     if (!cleaned) return null;
 
     let normalized: string;
@@ -49,7 +69,8 @@ function parseBrazilianPrice(text: string): number | null {
     }
 
     const value = parseFloat(normalized);
-    return isNaN(value) || value <= 0 ? null : value;
+    // Sanity check: no product should cost more than R$100k
+    return isNaN(value) || value <= 0 || value > 100_000 ? null : value;
 }
 
 function generatePurchaseId(): string {
@@ -125,14 +146,14 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
 
     audit.record('CONFIRMATION_VALIDATED', { confirmacao: true });
 
-    // Launch stealth browser
-    let browser: Browser | null = null;
+    // Launch persistent stealth browser (cookies/sessions preserved)
+    let closeBrowser: (() => Promise<void>) | null = null;
 
     try {
-        browser = await launchStealthBrowser();
-        audit.record('BROWSER_OPENED', { headless: true, stealth: true });
+        const { context, close } = await launchPersistentStealthContext();
+        closeBrowser = close;
+        audit.record('BROWSER_OPENED', { headless: true, stealth: true, persistent: true });
 
-        const context = await createHumanContext(browser);
         const page = await context.newPage();
         page.setDefaultTimeout(STEP_TIMEOUT);
 
@@ -382,6 +403,33 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         audit.record('ADD_TO_CART_CLICKED', {}, await takeScreenshot(page));
         await humanDelay(2000, 4000);
 
+        // ── Step 4.5: Verify cart is not empty ──────────────
+        // Some stores silently block the add-to-cart (anti-bot).
+        // Check for empty cart indicators after clicking.
+        const postClickText = (await page.textContent('body') || '').toLowerCase();
+        const emptyCartIndicators = [
+            'sacola está vazia', 'sacola vazia', 'carrinho vazio',
+            'carrinho está vazio', 'cart is empty', 'your cart is empty',
+            'nenhum item', 'nenhum produto no carrinho',
+        ];
+        const cartIsEmpty = emptyCartIndicators.some(t => postClickText.includes(t));
+
+        if (cartIsEmpty) {
+            audit.record('ERROR_OCCURRED', {
+                type: 'cart_empty_after_add',
+                hint: 'Anti-bot may have silently blocked the add-to-cart',
+            }, await takeScreenshot(page));
+
+            return {
+                result: failResult(
+                    'BLOCKED_BY_STORE',
+                    `A loja ${input.storeName} bloqueou a adição ao carrinho. O produto não foi adicionado. Tente comprar manualmente.`,
+                    input.productUrl,
+                ),
+                audit,
+            };
+        }
+
         // ── Step 5: Go to cart / checkout ────────────────────
 
         let atCheckout = await humanFindAndClick(page, selectors.goToCheckout, 'checkout');
@@ -391,6 +439,24 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
             if (wentToCart) {
                 audit.record('CART_CONFIRMED', {}, await takeScreenshot(page));
                 await humanDelay(2000, 3500);
+
+                // Check if cart page shows empty cart
+                const cartPageText = (await page.textContent('body') || '').toLowerCase();
+                if (emptyCartIndicators.some(t => cartPageText.includes(t))) {
+                    audit.record('ERROR_OCCURRED', {
+                        type: 'cart_empty_on_cart_page',
+                    }, await takeScreenshot(page));
+
+                    return {
+                        result: failResult(
+                            'BLOCKED_BY_STORE',
+                            `A sacola no ${input.storeName} está vazia. O produto não foi adicionado ao carrinho. Tente comprar manualmente.`,
+                            input.productUrl,
+                        ),
+                        audit,
+                    };
+                }
+
                 atCheckout = await humanFindAndClick(page, selectors.goToCheckout, 'checkout');
             }
         }
@@ -417,6 +483,31 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
 
         audit.record('CHECKOUT_STARTED', { url: page.url() }, await takeScreenshot(page));
         await humanDelay(1500, 3000);
+
+        // ── Step 5.5: Re-check for login wall at checkout ────
+        // Some stores only redirect to login AFTER reaching checkout
+        const checkoutUrl = page.url().toLowerCase();
+        const checkoutText = (await page.textContent('body') || '').toLowerCase();
+
+        const loginAtCheckout =
+            loginIndicators.some(p => checkoutUrl.includes(p)) ||
+            loginFormIndicators.some(t => checkoutText.includes(t));
+
+        if (loginAtCheckout) {
+            audit.record('LOGIN_WALL_DETECTED', {
+                url: page.url(),
+                stage: 'checkout',
+            }, await takeScreenshot(page));
+
+            return {
+                result: failResult(
+                    'STORE_LOGIN_REQUIRED',
+                    `A loja ${input.storeName} exige login para finalizar a compra. Acesse a loja, faça login e tente novamente.`,
+                    input.productUrl,
+                ),
+                audit,
+            };
+        }
 
         // ── Step 6: Fill address (human-like typing) ─────────
 
@@ -611,9 +702,9 @@ export async function executePurchaseFlow(input: PurchaseInput): Promise<{
         };
 
     } finally {
-        if (browser) {
+        if (closeBrowser) {
             try {
-                await browser.close();
+                await closeBrowser();
             } catch {
                 // Ignore close errors
             }

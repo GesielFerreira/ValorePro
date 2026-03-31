@@ -628,6 +628,77 @@ export type Database = {
                 }
                 Relationships: []
             }
+            watchlist: {
+                Row: {
+                    id: string
+                    user_id: string
+                    product_title: string
+                    product_url: string
+                    image_url: string | null
+                    store_name: string
+                    store_domain: string
+                    initial_price: number
+                    current_price: number | null
+                    lowest_price: number | null
+                    lowest_price_at: string | null
+                    highest_price: number | null
+                    shipping_cost: number
+                    price_trend: "rising" | "falling" | "stable"
+                    target_price: number | null
+                    status: string
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    user_id?: string
+                    product_title: string
+                    product_url: string
+                    image_url?: string | null
+                    store_name: string
+                    store_domain: string
+                    initial_price: number
+                    current_price?: number | null
+                    lowest_price?: number | null
+                    lowest_price_at?: string | null
+                    highest_price?: number | null
+                    shipping_cost?: number
+                    price_trend?: "rising" | "falling" | "stable"
+                    target_price?: number | null
+                    status?: string
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    product_title?: string
+                    product_url?: string
+                    image_url?: string | null
+                    store_name?: string
+                    store_domain?: string
+                    initial_price?: number
+                    current_price?: number | null
+                    lowest_price?: number | null
+                    lowest_price_at?: string | null
+                    highest_price?: number | null
+                    shipping_cost?: number
+                    price_trend?: "rising" | "falling" | "stable"
+                    target_price?: number | null
+                    status?: string
+                    created_at?: string
+                    updated_at?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "watchlist_user_id_fkey"
+                        columns: ["user_id"]
+                        isOneToOne: false
+                        referencedRelation: "users"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
             subscriptions: {
                 Row: {
                     id: string
